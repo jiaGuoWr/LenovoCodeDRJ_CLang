@@ -61,28 +61,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM 18 (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y llvm-18-dev libclang-18-dev libclang-cpp18-dev clang-tools-18 ninja-build
+      # Same install path as build-test.yml so behaviour stays identical
+      # between PR validation and release builds. KyleMayes' action
+      # provides the LLVM dev libraries (cmake config files included)
+      # that distro packages / choco LLVM lack.
+      - name: Install LLVM 18
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "18.1"
+          cached: true
 
-      - name: Install LLVM 18 (macOS)
-        if: runner.os == 'macOS'
+      - name: Install ninja
+        shell: bash
         run: |
-          brew install llvm@18 ninja
-          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
-
-      - name: Install LLVM 18 (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install llvm --version=18.1.8 -y
-          choco install ninja -y
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            sudo apt-get install -y ninja-build
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            brew install ninja
+          else
+            choco install ninja -y
+          fi
 
       - name: Configure
         shell: bash
         working-directory: LenovoTidyChecks
+        env:
+          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
+          Clang_DIR: ${{ env.LLVM_PATH }}/lib/cmake/clang
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLENOVO_TIDY_BUILD_TESTS=OFF
 
       - name: Build
