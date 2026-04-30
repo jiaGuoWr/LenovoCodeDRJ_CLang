@@ -14,9 +14,14 @@ TEST(NamingConventionHelpers, ConstantVsPascal) {
 }
 
 TEST(NamingConventionHelpers, InterfacePrefixFalsePositives) {
-  EXPECT_FALSE(lenovo::hasInterfacePrefix("IOStream"));  // acceptable but
-                                                         // still matches I+Pascal
-  // The above is intentionally true — it is the I+PascalCase form. We document
-  // this as a limitation in docs/rules/name001.md.
+  // Known limitation: hasInterfacePrefix is heuristic and matches any
+  // I+PascalCase identifier, including legitimate names like "IOStream".
+  // We accept this false-positive class because the alternative (a
+  // hand-curated allowlist of common types) drifts. Documented in
+  // docs/rules/name001.md.
+  //
+  // Pin the current behaviour so a future tightening of the heuristic
+  // surfaces here as a deliberate test failure rather than going
+  // unnoticed.
   EXPECT_TRUE(lenovo::hasInterfacePrefix("IOStream"));
 }
