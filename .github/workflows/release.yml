@@ -61,38 +61,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same install path as build-test.yml so behaviour stays identical
-      # between PR validation and release builds. KyleMayes' action
-      # provides the LLVM dev libraries (cmake config files included)
-      # that distro packages / choco LLVM lack.
-      - name: Install LLVM 18
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.1"
-          cached: true
-
-      - name: Install ninja
-        shell: bash
+      # Same install path as build-test.yml so PR validation and release
+      # builds remain reproducible. See build-test.yml for rationale.
+      - name: Install LLVM 18 + tools (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            sudo apt-get install -y ninja-build
-          elif [[ "${{ runner.os }}" == "macOS" ]]; then
-            brew install ninja
-          else
-            choco install ninja -y
-          fi
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/llvm.gpg
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" | sudo tee /etc/apt/sources.list.d/llvm-18.list
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libclang-18-dev libclang-cpp18-dev clang-tools-18 ninja-build
+
+      - name: Install LLVM 18 + tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@18 ninja
+          echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM 18 + tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz'
+          $dst = 'C:\llvm18.tar.xz'
+          Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
+          mkdir C:\llvm18 -Force | Out-Null
+          tar -xf $dst -C C:\llvm18 --strip-components=1
+          if (-not (Test-Path 'C:\llvm18\lib\cmake\llvm\LLVMConfig.cmake')) {
+            throw 'LLVMConfig.cmake missing after extraction'
+          }
+          choco install ninja -y
 
       - name: Locate LLVM cmake config
         id: llvm_cmake
         shell: bash
         run: |
-          LLVM_CFG=$(find "$LLVM_PATH" -name 'LLVMConfig.cmake' 2>/dev/null | head -1)
-          CLANG_CFG=$(find "$LLVM_PATH" -name 'ClangConfig.cmake' 2>/dev/null | head -1)
-          if [[ -z "$LLVM_CFG" || -z "$CLANG_CFG" ]]; then
-            echo "::error::LLVMConfig.cmake or ClangConfig.cmake not found under $LLVM_PATH"; exit 1
-          fi
-          echo "llvm_dir=$(dirname $LLVM_CFG)"   >> "$GITHUB_OUTPUT"
-          echo "clang_dir=$(dirname $CLANG_CFG)" >> "$GITHUB_OUTPUT"
+          case "${{ runner.os }}" in
+            Linux)   LLVM_DIR=/usr/lib/llvm-18/lib/cmake/llvm ; CLANG_DIR=/usr/lib/llvm-18/lib/cmake/clang ;;
+            macOS)   P=$(brew --prefix llvm@18) ; LLVM_DIR="$P/lib/cmake/llvm" ; CLANG_DIR="$P/lib/cmake/clang" ;;
+            Windows) LLVM_DIR='C:/llvm18/lib/cmake/llvm' ; CLANG_DIR='C:/llvm18/lib/cmake/clang' ;;
+          esac
+          [[ -d "$LLVM_DIR" && -d "$CLANG_DIR" ]] || { echo "::error::Missing $LLVM_DIR or $CLANG_DIR"; exit 1; }
+          echo "llvm_dir=$LLVM_DIR"   >> "$GITHUB_OUTPUT"
+          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Configure
         shell: bash
