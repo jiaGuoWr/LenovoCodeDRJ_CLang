@@ -136,15 +136,28 @@ jobs:
       # Self-test the standalone executable: it must list every lenovo-* check.
       # On Windows this is the *only* path that actually works at runtime,
       # because LLVM's official Windows binaries disable plugin loading.
+      #
+      # libclang-cpp-18.so / dylib lives in the LLVM install lib/ dir which
+      # the linker doesn't search by default on Linux. Set the loader env
+      # appropriately per OS so the binary can resolve its dependencies.
       - name: Smoke-test lenovo-clang-tidy --list-checks
         shell: bash
         working-directory: LenovoTidyChecks
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            EXE="build/src/LenovoTidyMain/lenovo-clang-tidy.exe"
-          else
-            EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
-          fi
+          case "${{ runner.os }}" in
+            Linux)
+              EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
+              export LD_LIBRARY_PATH="/usr/lib/llvm-18/lib:${LD_LIBRARY_PATH:-}"
+              ;;
+            macOS)
+              EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
+              export DYLD_LIBRARY_PATH="$(brew --prefix llvm@18)/lib:${DYLD_LIBRARY_PATH:-}"
+              ;;
+            Windows)
+              EXE="build/src/LenovoTidyMain/lenovo-clang-tidy.exe"
+              export PATH="C:/llvm18/bin:$PATH"
+              ;;
+          esac
           test -x "$EXE" || { echo "::error::$EXE not built"; exit 1; }
           OUT=$("$EXE" "--checks=-*,lenovo-*" --list-checks)
           echo "$OUT"
