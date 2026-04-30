@@ -1,8 +1,8 @@
 site_name: LenovoTidyChecks
 site_description: Lenovo DRJ 自定义 Clang-Tidy 插件文档
 site_url: https://example.internal.lenovo/drj-tidy/
-docs_dir: .
-site_dir: ../site
+docs_dir: docs
+site_dir: site
 
 theme:
   name: material
