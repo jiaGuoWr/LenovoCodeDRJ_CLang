@@ -23,7 +23,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-14, windows-2022]
+        # Windows is intentionally excluded from PR-validation: building
+        # LenovoTidyChecks against a full LLVM 18 dev install on hosted
+        # windows-2022 takes 25+ minutes (the official LLVM tarball is
+        # 600 MB and xz-decompresses very slowly on Windows). Release
+        # builds still run on Windows in release.yml at tag-push time.
+        # extension-build.yml separately validates the VS 2022 build
+        # toolchain on every PR.
+        os: [ubuntu-22.04, macos-14]
         build_type: [Debug, RelWithDebInfo]
     steps:
       - uses: actions/checkout@v4
