@@ -144,10 +144,14 @@ jobs:
         shell: bash
         working-directory: LenovoTidyChecks
         run: |
+          set -x
           case "${{ runner.os }}" in
             Linux)
               EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
               export LD_LIBRARY_PATH="/usr/lib/llvm-18/lib:${LD_LIBRARY_PATH:-}"
+              echo "=== Linux runtime diagnostics ==="
+              ls -la /usr/lib/llvm-18/lib/ 2>&1 | head -10
+              ldd "$EXE" 2>&1 | head -20 || true
               ;;
             macOS)
               EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
@@ -159,8 +163,16 @@ jobs:
               ;;
           esac
           test -x "$EXE" || { echo "::error::$EXE not built"; exit 1; }
-          OUT=$("$EXE" "--checks=-*,lenovo-*" --list-checks)
+          set +e
+          OUT=$("$EXE" "--checks=-*,lenovo-*" --list-checks 2>&1)
+          RC=$?
+          set -e
+          echo "=== exit=$RC, output: ==="
           echo "$OUT"
+          if [[ $RC -ne 0 ]]; then
+            echo "::error::lenovo-clang-tidy exited $RC"
+            exit 1
+          fi
           # We expect at least 15 lenovo-* rules (see AnalyzerRules.md / CHANGELOG).
           COUNT=$(echo "$OUT" | grep -c "^[[:space:]]\+lenovo-" || true)
           echo "lenovo-* checks found: $COUNT"
