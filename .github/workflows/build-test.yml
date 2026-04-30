@@ -143,15 +143,18 @@ jobs:
       - name: Smoke-test lenovo-clang-tidy --list-checks
         shell: bash
         working-directory: LenovoTidyChecks
+        # GH Actions defaults to `bash -eo pipefail`. Diagnostic commands
+        # (ls / ldd / otool) MUST guard against failure with `|| true`,
+        # otherwise a missing libdir aborts the whole script before we
+        # reach the actual smoke check.
         run: |
-          set -x
           case "${{ runner.os }}" in
             Linux)
               EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
               export LD_LIBRARY_PATH="/usr/lib/llvm-18/lib:${LD_LIBRARY_PATH:-}"
               echo "=== Linux runtime diagnostics ==="
-              ls -la /usr/lib/llvm-18/lib/ 2>&1 | head -10
-              ldd "$EXE" 2>&1 | head -20 || true
+              { ls -la /usr/lib/llvm-18/lib/libclang-cpp* 2>&1 | head -5; } || true
+              { ldd "$EXE" 2>&1 | head -25; } || true
               ;;
             macOS)
               EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
