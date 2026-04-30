@@ -1,0 +1,70 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "LENOVO_TIDY_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "base",
+      "displayName": "Linux Debug (clang-18)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang-18",
+        "CMAKE_CXX_COMPILER": "clang++-18"
+      }
+    },
+    {
+      "name": "linux-release",
+      "inherits": "linux-debug",
+      "displayName": "Linux Release (clang-18)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "macos-release",
+      "inherits": "base",
+      "displayName": "macOS Release (clang)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "windows-release",
+      "inherits": "base",
+      "displayName": "Windows Release (clang-cl / MSVC)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux-debug",    "configurePreset": "linux-debug" },
+    { "name": "linux-release",  "configurePreset": "linux-release" },
+    { "name": "macos-release",  "configurePreset": "macos-release" },
+    { "name": "windows-release","configurePreset": "windows-release" }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "stopOnFailure": false }
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "inherits": "linux-debug"
+    }
+  ]
+}

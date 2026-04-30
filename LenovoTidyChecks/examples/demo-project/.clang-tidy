@@ -1,0 +1,6 @@
+---
+Checks: 'lenovo-sec001-*,lenovo-chn001-*,lenovo-name001-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: file
+...

@@ -1,0 +1,92 @@
+name: build-test
+
+on:
+  pull_request:
+  push:
+    branches: [main, "release/**"]
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-2022]
+        build_type: [Debug, RelWithDebInfo]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            llvm-18-dev libclang-18-dev libclang-cpp18-dev \
+            clang-tools-18 ninja-build cmake python3-pip
+          pip3 install --user lit
+
+      - name: Install LLVM 18 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@18 ninja cmake
+          pip3 install --user lit
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
+
+      - name: Install LLVM 18 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install llvm --version=18.1.8 -y
+          choco install ninja -y
+          py -m pip install --user lit
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DLENOVO_TIDY_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check rule coverage
+        run: python3 scripts/generate_rules_index.py
+
+      # Self-test the standalone executable: it must list every lenovo-* check.
+      # On Windows this is the *only* path that actually works at runtime,
+      # because LLVM's official Windows binaries disable plugin loading.
+      - name: Smoke-test lenovo-clang-tidy --list-checks
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXE="build/src/LenovoTidyMain/lenovo-clang-tidy.exe"
+          else
+            EXE="build/src/LenovoTidyMain/lenovo-clang-tidy"
+          fi
+          test -x "$EXE" || { echo "::error::$EXE not built"; exit 1; }
+          OUT=$("$EXE" "--checks=-*,lenovo-*" --list-checks)
+          echo "$OUT"
+          # We expect at least 15 lenovo-* rules (see AnalyzerRules.md / CHANGELOG).
+          COUNT=$(echo "$OUT" | grep -c "^[[:space:]]\+lenovo-" || true)
+          echo "lenovo-* checks found: $COUNT"
+          if [[ "$COUNT" -lt 15 ]]; then
+            echo "::error::Expected >=15 lenovo-* rules, got $COUNT"
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        if: matrix.build_type == 'RelWithDebInfo'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LenovoTidyChecks-${{ matrix.os }}
+          path: |
+            build/src/LenovoTidyModule/libLenovoTidyChecks.*
+            build/src/LenovoTidyModule/LenovoTidyChecks.*
+            build/src/LenovoTidyMain/lenovo-clang-tidy
+            build/src/LenovoTidyMain/lenovo-clang-tidy.exe
+          if-no-files-found: warn

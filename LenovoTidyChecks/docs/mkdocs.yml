@@ -1,0 +1,81 @@
+site_name: LenovoTidyChecks
+site_description: Lenovo DRJ 自定义 Clang-Tidy 插件文档
+site_url: https://example.internal.lenovo/drj-tidy/
+docs_dir: .
+site_dir: ../site
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.integrate
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: 切换到夜间模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到日间模式
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+
+nav:
+  - 首页: index.md
+  - 架构: architecture.md
+  - LSP 服务器: lsp-server.md
+  - 开发指南:
+      - 开发流程: development-guide.md
+      - TDD 工作流: tdd-workflow.md
+  - IDE 集成:
+      - Visual Studio: ide-integration/visual-studio.md
+      - VS Code: ide-integration/vscode.md
+  - CI 集成: ci-integration.md
+  - 决策记录:
+      - ADR-0001 LSP 用 Rust: adr/0001-lsp-rust.md
+      - ADR-0002 跳过 DLL002 SEC009: adr/0002-skip-dll002-sec009.md
+  - 规则参考:
+      - 安全:
+          - SEC001 硬编码敏感信息: rules/sec001.md
+          - SEC002 路径遍历: rules/sec002.md
+          - SEC003 SQL 注入: rules/sec003.md
+          - SEC004 不安全反序列化: rules/sec004.md
+          - SEC005 不安全随机数: rules/sec005.md
+          - SEC006 正则 DoS: rules/sec006.md
+          - SEC007 资源泄漏: rules/sec007.md
+          - SEC008 不安全临时文件: rules/sec008.md
+          - SEC010 竞态条件: rules/sec010.md
+          - SEC011 不安全 IPC: rules/sec011.md
+          - DLL003 不安全 DLL 加载: rules/dll003.md
+      - 可靠性:
+          - EXC001 catch 中打印栈跟踪: rules/exc001.md
+      - 可维护性:
+          - CODE001 注释中的代码: rules/code001.md
+      - 本地化:
+          - CHN001 注释中文: rules/chn001.md
+      - 命名:
+          - NAME001 命名规范: rules/name001.md

@@ -1,0 +1,57 @@
+name: lsp-build
+
+on:
+  pull_request:
+    paths:
+      - "LenovoTidyLsp/**"
+      - ".github/workflows/lsp-build.yml"
+  push:
+    branches: [main, "release/**"]
+    paths:
+      - "LenovoTidyLsp/**"
+      - ".github/workflows/lsp-build.yml"
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: lenovo-tidy-lsp
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: lenovo-tidy-lsp
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            artifact: lenovo-tidy-lsp.exe
+    defaults:
+      run:
+        working-directory: LenovoTidyLsp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: LenovoTidyLsp
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Test
+        run: cargo test --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lenovo-tidy-lsp-${{ matrix.os }}
+          path: LenovoTidyLsp/target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          if-no-files-found: error

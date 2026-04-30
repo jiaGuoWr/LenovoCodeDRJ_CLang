@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "LenovoTidyVs2022", "LenovoTidyVs2022", "{C926A257-4BB5-7833-DDDA-72BB137BBDD9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LenovoTidy", "LenovoTidyVs2022\LenovoTidy.csproj", "{AD86CC22-96C6-2D05-5B98-00D151A127B2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AD86CC22-96C6-2D05-5B98-00D151A127B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD86CC22-96C6-2D05-5B98-00D151A127B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD86CC22-96C6-2D05-5B98-00D151A127B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD86CC22-96C6-2D05-5B98-00D151A127B2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AD86CC22-96C6-2D05-5B98-00D151A127B2} = {C926A257-4BB5-7833-DDDA-72BB137BBDD9}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DE6B158A-AB45-4B8F-BEEA-B003E959CB85}
+	EndGlobalSection
+EndGlobal
