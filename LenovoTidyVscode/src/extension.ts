@@ -22,17 +22,28 @@ let extensionContext: ExtensionContext | undefined;
 
 const SKIP_AUTO_KEY = "lenovoTidy.skipAutoConfigureForWorkspace";
 
-// Directories that hold compile_commands.json by convention, in priority order.
-// First match wins.
-const DB_SEARCH_DIRS = [
+// Fallback only. The authoritative list lives in
+// `package.json` -> `lenovoTidy.compileCommandsSearchPaths` (same entries,
+// same order). Both this extension and the Rust LSP server read from that
+// config so there is a single source of truth.
+const DEFAULT_DB_SEARCH_DIRS: readonly string[] = [
   "build",
   "out",
   "cmake-build-debug",
   "cmake-build-release",
   "cmake-build-relwithdebinfo",
   ".vscode",
-  "", // workspace root itself
+  "",
 ];
+
+function getCompileCommandsSearchPaths(): string[] {
+  const config = workspace.getConfiguration("lenovoTidy");
+  const fromSettings = config.get<string[]>("compileCommandsSearchPaths");
+  if (Array.isArray(fromSettings) && fromSettings.length > 0) {
+    return fromSettings;
+  }
+  return [...DEFAULT_DB_SEARCH_DIRS];
+}
 
 export async function activate(context: ExtensionContext): Promise<void> {
   extensionContext = context;
@@ -90,6 +101,7 @@ async function startClient(
       stringOrUndefined(config.get<string>("pluginPath")) ??
       bundledPluginPath(context),
     compileCommandsDir: compileDbDir,
+    compileCommandsSearchPaths: getCompileCommandsSearchPaths(),
     checks: config.get<string>("checks") ?? "lenovo-*",
     extraArgs: config.get<string[]>("extraArgs") ?? [],
   };
@@ -176,7 +188,7 @@ async function ensureCompileCommandsDir(
 }
 
 function scanForDb(wsRoot: string): string | undefined {
-  for (const sub of DB_SEARCH_DIRS) {
+  for (const sub of getCompileCommandsSearchPaths()) {
     const dir = sub === "" ? wsRoot : path.join(wsRoot, sub);
     if (fileExists(path.join(dir, "compile_commands.json"))) {
       return dir;

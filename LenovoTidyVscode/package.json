@@ -36,6 +36,20 @@
           "default": "",
           "description": "Directory containing compile_commands.json. Empty = auto-detect (scans build/, out/, cmake-build-*, .vscode/ and the workspace root)."
         },
+        "lenovoTidy.compileCommandsSearchPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [
+            "build",
+            "out",
+            "cmake-build-debug",
+            "cmake-build-release",
+            "cmake-build-relwithdebinfo",
+            ".vscode",
+            ""
+          ],
+          "description": "Relative directories the extension (and the LSP server) walk up from the source file looking for compile_commands.json. An empty string means \"the current directory itself\". First match wins."
+        },
         "lenovoTidy.autoConfigureCmake": {
           "type": "boolean",
           "default": true,

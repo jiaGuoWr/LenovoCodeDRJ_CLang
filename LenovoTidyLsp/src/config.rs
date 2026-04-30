@@ -12,9 +12,31 @@ pub struct InitOptions {
     pub clang_tidy_path: Option<String>,
     pub plugin_path: Option<String>,
     pub compile_commands_dir: Option<String>,
+    /// Relative sub-directories the discovery walker checks at every level
+    /// on the way up from the source file. An empty string means "current
+    /// directory itself". When the client does not send this (older VS Code
+    /// extension, or the VS 2022 client which predates this config), the
+    /// server falls back to [`default_compile_commands_search_paths`] so
+    /// behaviour stays identical to the pre-refactor hard-coded list.
+    pub compile_commands_search_paths: Option<Vec<String>>,
     pub checks: Option<String>,
     /// Extra arguments forwarded verbatim to clang-tidy.
     pub extra_args: Option<Vec<String>>,
+}
+
+/// Authoritative default list of `compile_commands.json` search directories.
+/// Kept in lock-step with `LenovoTidyVscode/package.json` ->
+/// `lenovoTidy.compileCommandsSearchPaths.default`. First match wins.
+pub fn default_compile_commands_search_paths() -> Vec<String> {
+    vec![
+        "build".to_owned(),
+        "out".to_owned(),
+        "cmake-build-debug".to_owned(),
+        "cmake-build-release".to_owned(),
+        "cmake-build-relwithdebinfo".to_owned(),
+        ".vscode".to_owned(),
+        String::new(), // the directory itself
+    ]
 }
 
 /// Resolved configuration used by the driver. Required fields must be present
@@ -30,6 +52,11 @@ pub struct Config {
     /// `clang_tidy_path` already points at the bundled lenovo-clang-tidy.
     pub plugin_path: Option<PathBuf>,
     pub compile_commands_dir: Option<PathBuf>,
+    /// Relative sub-directories to search when walking up from a source
+    /// file looking for `compile_commands.json`. Always non-empty after
+    /// `Config::from_options`: we fall back to the hard-coded default when
+    /// the client does not supply one.
+    pub compile_commands_search_paths: Vec<String>,
     pub checks: String,
     pub extra_args: Vec<String>,
 }
@@ -91,10 +118,16 @@ impl Config {
             .or_else(|| std::env::var("LENOVO_COMPILE_DB").ok())
             .map(PathBuf::from);
 
+        let compile_commands_search_paths = opts
+            .compile_commands_search_paths
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(default_compile_commands_search_paths);
+
         Ok(Config {
             clang_tidy_path,
             plugin_path,
             compile_commands_dir,
+            compile_commands_search_paths,
             checks: opts.checks.unwrap_or_else(|| "lenovo-*".to_owned()),
             extra_args: opts.extra_args.unwrap_or_default(),
         })
