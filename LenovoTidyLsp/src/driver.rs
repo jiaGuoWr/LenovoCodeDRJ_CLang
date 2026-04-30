@@ -48,7 +48,9 @@ pub async fn run_clang_tidy(file: &Path, cfg: &Config) -> Result<DriverOutput, D
     //      build/, out/, cmake-build-*/, .vscode/, or the workspace root.
     // Either way we pass `-p <dir>` to clang-tidy.
     let compile_db_dir = cfg.compile_commands_dir.clone().or_else(|| {
-        file.parent().and_then(crate::discovery::find_compile_db)
+        file.parent().and_then(|parent| {
+            crate::discovery::find_compile_db(parent, &cfg.compile_commands_search_paths)
+        })
     });
     if let Some(p) = &compile_db_dir {
         cmd.arg("-p").arg(p);

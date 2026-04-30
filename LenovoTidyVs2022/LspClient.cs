@@ -50,7 +50,20 @@ namespace LenovoTidy
         public bool ShowNotificationOnInitializeFailed => true;
 
         public event AsyncEventHandler<EventArgs>? StartAsync;
+
+        // StopAsync is required by the ILanguageClient interface - VS subscribes
+        // to it during activation and will forward an LSP `shutdown` request to
+        // the server when we invoke it. We never invoke it ourselves because
+        // there is no symmetric "VS tells us to stop" callback; VS 2022 also
+        // has no built-in UI (unlike VS Code's command) that would trigger a
+        // client-driven restart. VS still tears the LSP down cleanly via the
+        // normal devenv shutdown path. CS0067 ("event never used") is therefore
+        // expected and suppressed here rather than worked around with a fake
+        // invocation. If a future change adds a "Restart Language Server"
+        // command, drop the pragma and invoke StopAsync from that handler.
+#pragma warning disable CS0067
         public event AsyncEventHandler<EventArgs>? StopAsync;
+#pragma warning restore CS0067
 
         public async Task<Connection?> ActivateAsync(CancellationToken token)
         {
