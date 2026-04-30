@@ -82,13 +82,26 @@ jobs:
             choco install ninja -y
           fi
 
+      - name: Locate LLVM cmake config
+        id: llvm_cmake
+        shell: bash
+        run: |
+          LLVM_CFG=$(find "$LLVM_PATH" -name 'LLVMConfig.cmake' 2>/dev/null | head -1)
+          CLANG_CFG=$(find "$LLVM_PATH" -name 'ClangConfig.cmake' 2>/dev/null | head -1)
+          if [[ -z "$LLVM_CFG" || -z "$CLANG_CFG" ]]; then
+            echo "::error::LLVMConfig.cmake or ClangConfig.cmake not found under $LLVM_PATH"; exit 1
+          fi
+          echo "llvm_dir=$(dirname $LLVM_CFG)"   >> "$GITHUB_OUTPUT"
+          echo "clang_dir=$(dirname $CLANG_CFG)" >> "$GITHUB_OUTPUT"
+
       - name: Configure
         shell: bash
         working-directory: LenovoTidyChecks
-        env:
-          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
-          Clang_DIR: ${{ env.LLVM_PATH }}/lib/cmake/clang
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLENOVO_TIDY_BUILD_TESTS=OFF
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLENOVO_TIDY_BUILD_TESTS=OFF \
+            -DLLVM_DIR="${{ steps.llvm_cmake.outputs.llvm_dir }}" \
+            -DClang_DIR="${{ steps.llvm_cmake.outputs.clang_dir }}"
 
       - name: Build
         working-directory: LenovoTidyChecks
