@@ -28,55 +28,81 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # KyleMayes/install-llvm-action ships the LLVM developer libraries
-      # (headers + cmake config files) on all 3 OSes. The previously used
-      # path - apt-get install / choco install - either pulled the wrong
-      # packages (Ubuntu's defaults lack libclang-cpp18-dev) or only
-      # provided the runtime tarball (choco LLVM has no cmake/llvm/
-      # config files, so find_package(LLVM CONFIG) fails). The action
-      # caches the install for subsequent runs.
-      - name: Install LLVM 18
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.1"
-          cached: true
-
-      - name: Install ninja + lit
-        shell: bash
+      # LLVM 18 dev libraries (headers + cmake config files). The earlier
+      # KyleMayes/install-llvm-action attempt only installed the runtime
+      # tarball, so find_package(LLVM CONFIG) failed. We now use each
+      # OS's canonical package source which ships the dev artefacts.
+      - name: Install LLVM 18 + tools (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            sudo apt-get install -y ninja-build python3-pip
-            pip3 install --user --break-system-packages lit || pip3 install --user lit
-          elif [[ "${{ runner.os }}" == "macOS" ]]; then
-            brew install ninja
-            pip3 install --user --break-system-packages lit || true
-          else
-            choco install ninja -y
-            py -m pip install --user lit
-          fi
+          # apt.llvm.org has llvm-18-dev / libclang-18-dev / libclang-cpp18-dev
+          # for jammy; the default Ubuntu repos do not.
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/llvm.gpg
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" | sudo tee /etc/apt/sources.list.d/llvm-18.list
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libclang-18-dev libclang-cpp18-dev clang-tools-18 ninja-build python3-pip
+          pip3 install --user --break-system-packages lit || pip3 install --user lit
+
+      - name: Install LLVM 18 + tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@18 ninja
+          # PEP 668 forces --break-system-packages on macos-14 (Python 3.12+).
+          # lit is only needed if we run lit-style tests; ignore failure.
+          pip3 install --user --break-system-packages lit || true
+          echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM 18 + tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Official LLVM Windows release tarball (NOT the choco package
+          # which is runtime-only). Includes lib/cmake/llvm/LLVMConfig.cmake
+          # and lib/cmake/clang/ClangConfig.cmake that we need.
+          $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz'
+          $dst = 'C:\llvm18.tar.xz'
+          Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
+          mkdir C:\llvm18 -Force | Out-Null
+          tar -xf $dst -C C:\llvm18 --strip-components=1
+          # Smoke check
+          if (-not (Test-Path 'C:\llvm18\lib\cmake\llvm\LLVMConfig.cmake')) {
+            Get-ChildItem C:\llvm18 -Recurse -Name 'LLVMConfig.cmake' | Select-Object -First 5
+            throw 'LLVMConfig.cmake missing after extraction'
+          }
+          choco install ninja -y
+          py -m pip install --user lit
+          echo "LLVM_HOME=C:\llvm18" >> $env:GITHUB_ENV
 
       - name: Locate LLVM cmake config
         id: llvm_cmake
         shell: bash
         run: |
-          # KyleMayes/install-llvm-action exports LLVM_PATH to GITHUB_ENV.
-          # Discover the actual LLVMConfig.cmake / ClangConfig.cmake
-          # location instead of guessing the layout (may differ between
-          # OSes and between LLVM project releases).
-          echo "LLVM_PATH=$LLVM_PATH"
-          ls -la "$LLVM_PATH" 2>&1 | head -20 || true
-          LLVM_CFG=$(find "$LLVM_PATH" -name 'LLVMConfig.cmake' 2>/dev/null | head -1)
-          CLANG_CFG=$(find "$LLVM_PATH" -name 'ClangConfig.cmake' 2>/dev/null | head -1)
-          if [[ -z "$LLVM_CFG" || -z "$CLANG_CFG" ]]; then
-            echo "::error::LLVMConfig.cmake or ClangConfig.cmake not found under $LLVM_PATH"
-            find "$LLVM_PATH" -name '*Config.cmake' 2>&1 | head -20
-            exit 1
-          fi
-          LLVM_DIR=$(dirname "$LLVM_CFG")
-          CLANG_DIR=$(dirname "$CLANG_CFG")
+          # Per-OS resolution rather than searching, so the failure mode
+          # is "package missing" rather than "find returned empty".
+          case "${{ runner.os }}" in
+            Linux)
+              LLVM_DIR=/usr/lib/llvm-18/lib/cmake/llvm
+              CLANG_DIR=/usr/lib/llvm-18/lib/cmake/clang
+              ;;
+            macOS)
+              PREFIX=$(brew --prefix llvm@18)
+              LLVM_DIR="$PREFIX/lib/cmake/llvm"
+              CLANG_DIR="$PREFIX/lib/cmake/clang"
+              ;;
+            Windows)
+              LLVM_DIR='C:/llvm18/lib/cmake/llvm'
+              CLANG_DIR='C:/llvm18/lib/cmake/clang'
+              ;;
+          esac
+          for d in "$LLVM_DIR" "$CLANG_DIR"; do
+            if [[ ! -d "$d" ]]; then
+              echo "::error::Expected cmake package dir does not exist: $d"
+              exit 1
+            fi
+          done
           echo "LLVM_DIR=$LLVM_DIR"
           echo "Clang_DIR=$CLANG_DIR"
-          echo "llvm_dir=$LLVM_DIR" >> "$GITHUB_OUTPUT"
+          echo "llvm_dir=$LLVM_DIR"   >> "$GITHUB_OUTPUT"
           echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Configure
