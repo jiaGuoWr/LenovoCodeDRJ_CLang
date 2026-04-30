@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LenovoTidy</RootNamespace>
+    <AssemblyName>LenovoTidy</AssemblyName>
+    <DeployExtension>false</DeployExtension>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <CopyVsixManifestToOutput>true</CopyVsixManifestToOutput>
+    <CopyVsixManifestSignatureToOutput>false</CopyVsixManifestSignatureToOutput>
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="LICENSE.txt" />
+    <None Include="README.md" />
+    <None Include="server-bin\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.8.37221" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.8.2365" PrivateAssets="all" />
+    <!--
+      Pinned to 17.12.48 because VS 2022 17.14 ships
+      Microsoft.VisualStudio.LanguageServer.Client.dll with AssemblyVersion
+      17.12.0.0 (file 17.12.51). Strong-name binding is strict in .NET 4.x;
+      a mismatch (e.g. our previous 17.9.0.0 reference vs the system's
+      17.12.0.0) makes the CLR fail to resolve the assembly when MEF tries
+      to instantiate LenovoTidyClient, silently skipping our LSP client.
+      Keep this version in lock-step with whichever runtime the supported
+      VS line ships - bump it when you bump the minimum VS version in the
+      vsixmanifest.
+    -->
+    <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.12.48" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!--
+      Pin the highest System.Text.Json the dependency tree pulls in, so
+      NuGet doesn't fail the restore with NU1605 (a 8.0.4 / 8.0.5 split
+      between LanguageServer.Client and the rest of the VSSDK). VS already
+      ships System.Text.Json at runtime, so PrivateAssets="all" keeps it
+      out of the vsix payload.
+    -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" PrivateAssets="all" />
+      <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

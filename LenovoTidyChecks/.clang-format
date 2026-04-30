@@ -1,0 +1,28 @@
+---
+BasedOnStyle: LLVM
+ColumnLimit: 100
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+Standard: c++17
+NamespaceIndentation: None
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBraces: Attach
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"[^/]*\.h"$'
+    Priority: 1
+  - Regex: '^".*/.*\.h"$'
+    Priority: 2
+  - Regex: '^<(clang|llvm)/.*>$'
+    Priority: 3
+  - Regex: '^<gtest/.*>$'
+    Priority: 4
+  - Regex: '^<.*\..*>$'
+    Priority: 5
+  - Regex: '^<.*>$'
+    Priority: 6
+...

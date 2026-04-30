@@ -1,0 +1,93 @@
+{
+  "name": "lenovo-tidy-vscode",
+  "displayName": "Lenovo Tidy",
+  "description": "Lenovo DRJ custom Clang-Tidy rules for C++ (LSP-powered)",
+  "version": "0.2.0",
+  "publisher": "lenovo",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "Programming Languages"],
+  "activationEvents": [
+    "onLanguage:cpp",
+    "onLanguage:c",
+    "onLanguage:objective-c",
+    "onLanguage:objective-cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Lenovo Tidy",
+      "properties": {
+        "lenovoTidy.clangTidyPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a clang-tidy executable matching LLVM 18. Empty = auto-detect (prefers the bundled lenovo-clang-tidy.exe)."
+        },
+        "lenovoTidy.pluginPath": {
+          "type": "string",
+          "default": "",
+          "description": "Linux/macOS only: absolute path to libLenovoTidyChecks.{so,dylib}. On Windows this is ignored because the bundled lenovo-clang-tidy.exe has the rules statically linked."
+        },
+        "lenovoTidy.compileCommandsDir": {
+          "type": "string",
+          "default": "",
+          "description": "Directory containing compile_commands.json. Empty = auto-detect (scans build/, out/, cmake-build-*, .vscode/ and the workspace root)."
+        },
+        "lenovoTidy.autoConfigureCmake": {
+          "type": "boolean",
+          "default": true,
+          "description": "When no compile_commands.json is found AND a CMakeLists.txt is detected, offer to run `cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` automatically."
+        },
+        "lenovoTidy.cmakeExecutable": {
+          "type": "string",
+          "default": "cmake",
+          "description": "Name or absolute path of the CMake executable used for auto-configure."
+        },
+        "lenovoTidy.checks": {
+          "type": "string",
+          "default": "lenovo-*",
+          "description": "Clang-tidy --checks filter."
+        },
+        "lenovoTidy.extraArgs": {
+          "type": "array",
+          "default": [],
+          "description": "Extra arguments forwarded to clang-tidy."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "lenovoTidy.regenerateCompileCommands",
+        "title": "Regenerate compile_commands.json",
+        "category": "Lenovo Tidy"
+      },
+      {
+        "command": "lenovoTidy.showOutput",
+        "title": "Show Server Output",
+        "category": "Lenovo Tidy"
+      },
+      {
+        "command": "lenovoTidy.restartServer",
+        "title": "Restart Language Server",
+        "category": "Lenovo Tidy"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="LenovoTidy.VS2022.f89e3441" Version="0.2.0" Language="en-US" Publisher="Lenovo" />
+    <DisplayName>Lenovo Tidy</DisplayName>
+    <Description xml:space="preserve">Lenovo DRJ custom Clang-Tidy rules for C++ (LSP-powered).</Description>
+    <MoreInfo>https://github.com/your-org/LenovoTidyChecks</MoreInfo>
+    <License>LICENSE.txt</License>
+    <Tags>clang-tidy, cpp, c, linter, lsp, security</Tags>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,18.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.0,18.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.0,18.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Dependencies>
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName=".NET Framework" d:Source="Manual" Version="[4.7.2,)" />
+  </Dependencies>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,18.0)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="LenovoTidy" Path="|LenovoTidy|" />
+    <Asset Type="LenovoTidy.ServerBin" d:Source="File" Path="server-bin\win32-x64\lenovo-tidy-lsp.exe" />
+  </Assets>
+</PackageManifest>

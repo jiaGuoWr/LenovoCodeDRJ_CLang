@@ -1,0 +1,36 @@
+[package]
+name = "lenovo-tidy-lsp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lenovo DRJ team"]
+description = "Language server that exposes LenovoTidyChecks (clang-tidy plugin) to VS Code, VS 2022 and any other LSP-capable editor"
+license = "Apache-2.0"
+repository = "https://github.com/your-org/LenovoTidyChecks"
+rust-version = "1.74"
+
+[[bin]]
+name = "lenovo-tidy-lsp"
+path = "src/main.rs"
+
+[dependencies]
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3"
+which = "6"
+
+[dev-dependencies]
+assert_cmd = "2"
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

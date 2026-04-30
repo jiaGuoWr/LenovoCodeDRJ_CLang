@@ -1,0 +1,88 @@
+name: extension-package
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  vscode:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download LSP linux x64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lenovo-tidy-lsp-ubuntu-22.04
+          path: LenovoTidyVscode/server-bin/linux-x64
+
+      - name: Download LSP macOS arm64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lenovo-tidy-lsp-macos-14
+          path: LenovoTidyVscode/server-bin/darwin-arm64
+
+      - name: Download LSP Windows x64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lenovo-tidy-lsp-windows-2022
+          path: LenovoTidyVscode/server-bin/win32-x64
+
+      - name: chmod
+        run: |
+          chmod +x LenovoTidyVscode/server-bin/linux-x64/lenovo-tidy-lsp || true
+          chmod +x LenovoTidyVscode/server-bin/darwin-arm64/lenovo-tidy-lsp || true
+
+      - name: Install deps
+        working-directory: LenovoTidyVscode
+        run: npm ci
+
+      - name: Compile
+        working-directory: LenovoTidyVscode
+        run: npx tsc -p ./
+
+      - name: Package vsix
+        working-directory: LenovoTidyVscode
+        run: npx vsce package --out lenovo-tidy-vscode.vsix
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: LenovoTidyVscode/lenovo-tidy-vscode.vsix
+
+  vs2022:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: lenovo-tidy-lsp-windows-2022
+          path: LenovoTidyVs2022/server-bin/win32-x64
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore
+        working-directory: LenovoTidyVs2022
+        run: dotnet restore LenovoTidy.csproj
+
+      - name: Build
+        working-directory: LenovoTidyVs2022
+        run: msbuild LenovoTidy.csproj /p:Configuration=Release /p:DeployExtension=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LenovoTidy-vs2022-vsix
+          path: LenovoTidyVs2022/bin/Release/**/LenovoTidy.vsix
+          if-no-files-found: error
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: LenovoTidyVs2022/bin/Release/**/LenovoTidy.vsix
