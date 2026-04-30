@@ -55,18 +55,39 @@ jobs:
             py -m pip install --user lit
           fi
 
+      - name: Locate LLVM cmake config
+        id: llvm_cmake
+        shell: bash
+        run: |
+          # KyleMayes/install-llvm-action exports LLVM_PATH to GITHUB_ENV.
+          # Discover the actual LLVMConfig.cmake / ClangConfig.cmake
+          # location instead of guessing the layout (may differ between
+          # OSes and between LLVM project releases).
+          echo "LLVM_PATH=$LLVM_PATH"
+          ls -la "$LLVM_PATH" 2>&1 | head -20 || true
+          LLVM_CFG=$(find "$LLVM_PATH" -name 'LLVMConfig.cmake' 2>/dev/null | head -1)
+          CLANG_CFG=$(find "$LLVM_PATH" -name 'ClangConfig.cmake' 2>/dev/null | head -1)
+          if [[ -z "$LLVM_CFG" || -z "$CLANG_CFG" ]]; then
+            echo "::error::LLVMConfig.cmake or ClangConfig.cmake not found under $LLVM_PATH"
+            find "$LLVM_PATH" -name '*Config.cmake' 2>&1 | head -20
+            exit 1
+          fi
+          LLVM_DIR=$(dirname "$LLVM_CFG")
+          CLANG_DIR=$(dirname "$CLANG_CFG")
+          echo "LLVM_DIR=$LLVM_DIR"
+          echo "Clang_DIR=$CLANG_DIR"
+          echo "llvm_dir=$LLVM_DIR" >> "$GITHUB_OUTPUT"
+          echo "clang_dir=$CLANG_DIR" >> "$GITHUB_OUTPUT"
+
       - name: Configure
         shell: bash
         working-directory: LenovoTidyChecks
-        env:
-          # KyleMayes' action sets LLVM_PATH; cmake's find_package(LLVM CONFIG)
-          # uses LLVM_DIR. Translate.
-          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
-          Clang_DIR: ${{ env.LLVM_PATH }}/lib/cmake/clang
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DLENOVO_TIDY_BUILD_TESTS=ON
+            -DLENOVO_TIDY_BUILD_TESTS=ON \
+            -DLLVM_DIR="${{ steps.llvm_cmake.outputs.llvm_dir }}" \
+            -DClang_DIR="${{ steps.llvm_cmake.outputs.clang_dir }}"
 
       - name: Build
         working-directory: LenovoTidyChecks
