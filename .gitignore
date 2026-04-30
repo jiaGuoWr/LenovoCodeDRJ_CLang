@@ -56,12 +56,12 @@ __pycache__/
 .venv/
 venv/
 
-# ---------------------- Test code (per user request) -----------------------
-# Integration + unit tests that live in dedicated sub-folders. Embedded
-# `#[cfg(test)]` blocks inside Rust source files are not separable and
-# remain in the committed source.
-LenovoTidyLsp/tests/
-LenovoTidyChecks/tests/
+# ---------------------- Test code -----------------------------------------
+# Tests are committed (CI needs them). Only ignore generated/transient
+# artefacts under the test directories.
+LenovoTidyChecks/tests/__pycache__/
+LenovoTidyChecks/tests/lit.site.cfg.py
+LenovoTidyChecks/tests/Output/
 
 # ---------------------- Distribution artefacts -----------------------------
 # The dist/ folder holds ~250 MB of compiled VSIX + lenovo-clang-tidy.exe.

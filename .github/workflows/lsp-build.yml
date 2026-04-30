@@ -11,6 +11,10 @@ on:
       - "LenovoTidyLsp/**"
       - ".github/workflows/lsp-build.yml"
 
+concurrency:
+  group: lsp-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: ${{ matrix.os }}

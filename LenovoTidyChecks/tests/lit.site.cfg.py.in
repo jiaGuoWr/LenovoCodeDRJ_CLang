@@ -1,0 +1,16 @@
+@LIT_SITE_CFG_IN_HEADER@
+import lit.util
+
+config.name                = "LenovoTidyChecks"
+config.test_format         = None
+config.suffixes            = [".cpp", ".cc", ".cxx", ".c"]
+config.excludes            = ["CMakeLists.txt", "Inputs"]
+config.test_source_root    = r"@CMAKE_CURRENT_SOURCE_DIR@/checkers"
+config.test_exec_root      = r"@CMAKE_CURRENT_BINARY_DIR@/checkers-run"
+
+config.lenovo_plugin       = r"@LENOVO_LIT_PLUGIN_PATH@"
+config.clang_tidy          = r"@LENOVO_LIT_CLANG_TIDY@"
+config.filecheck           = r"@LENOVO_LIT_FILECHECK@"
+config.source_dir          = r"@CMAKE_CURRENT_SOURCE_DIR@"
+
+lit_config.load_config(config, r"@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg.py")

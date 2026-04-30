@@ -1,0 +1,89 @@
+name: extension-build
+
+# Compile-only sanity check for the two IDE extensions on every PR/push.
+# Real packaging (with bundled LSP + plugin binaries) happens on tag push
+# in release.yml.
+
+on:
+  pull_request:
+    paths:
+      - "LenovoTidyVscode/**"
+      - "LenovoTidyVs2022/**"
+      - "windows-build/repackage-vs2022-vsix.ps1"
+      - ".github/workflows/extension-build.yml"
+  push:
+    branches: [main, "release/**"]
+    paths:
+      - "LenovoTidyVscode/**"
+      - "LenovoTidyVs2022/**"
+      - "windows-build/repackage-vs2022-vsix.ps1"
+      - ".github/workflows/extension-build.yml"
+
+concurrency:
+  group: extension-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vscode:
+    name: VS Code (tsc)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: LenovoTidyVscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: LenovoTidyVscode/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit -p ./
+
+      - name: Validate package.json schema
+        run: node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
+
+  vs2022:
+    name: VS 2022 (dotnet build)
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: LenovoTidyVs2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # The repo-local NuGet config pins to nuget.org so CI does not try
+      # to hit any internal mirror that might be configured via the
+      # ambient user/machine NuGet.Config.
+      - name: Restore
+        run: dotnet restore LenovoTidy.csproj --configfile ../windows-build/nuget.config
+
+      - name: Build (no VSIX assembly)
+        run: |
+          dotnet build LenovoTidy.csproj `
+            --configuration Release `
+            --no-restore `
+            /p:DeployExtension=false `
+            /p:CreateVsixContainer=false `
+            --verbosity minimal
+
+      - name: Confirm DLL produced and references match system LSP Client
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Recurse -Filter LenovoTidy.dll -Path bin -EA 0 | Select-Object -First 1
+          if (-not $dll) { throw "LenovoTidy.dll not produced" }
+          $asm = [Reflection.Assembly]::LoadFile($dll.FullName)
+          $ref = $asm.GetReferencedAssemblies() | Where-Object { $_.Name -eq 'Microsoft.VisualStudio.LanguageServer.Client' }
+          Write-Host "  References LanguageServer.Client v$($ref.Version)"
+          if ($ref.Version -ne [Version]'17.12.0.0') {
+            throw "Strong-name regression: dll references v$($ref.Version), expected 17.12.0.0"
+          }

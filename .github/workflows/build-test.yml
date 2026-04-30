@@ -2,8 +2,19 @@ name: build-test
 
 on:
   pull_request:
+    paths:
+      - "LenovoTidyChecks/**"
+      - ".github/workflows/build-test.yml"
   push:
     branches: [main, "release/**"]
+    paths:
+      - "LenovoTidyChecks/**"
+      - ".github/workflows/build-test.yml"
+
+# Cancel any in-flight runs for the same branch when a new push lands.
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -43,18 +54,22 @@ jobs:
 
       - name: Configure
         shell: bash
+        working-directory: LenovoTidyChecks
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DLENOVO_TIDY_BUILD_TESTS=ON
 
       - name: Build
+        working-directory: LenovoTidyChecks
         run: cmake --build build -j
 
       - name: Test
+        working-directory: LenovoTidyChecks
         run: ctest --test-dir build --output-on-failure
 
       - name: Check rule coverage
+        working-directory: LenovoTidyChecks
         run: python3 scripts/generate_rules_index.py
 
       # Self-test the standalone executable: it must list every lenovo-* check.
@@ -62,6 +77,7 @@ jobs:
       # because LLVM's official Windows binaries disable plugin loading.
       - name: Smoke-test lenovo-clang-tidy --list-checks
         shell: bash
+        working-directory: LenovoTidyChecks
         run: |
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             EXE="build/src/LenovoTidyMain/lenovo-clang-tidy.exe"
@@ -85,8 +101,8 @@ jobs:
         with:
           name: LenovoTidyChecks-${{ matrix.os }}
           path: |
-            build/src/LenovoTidyModule/libLenovoTidyChecks.*
-            build/src/LenovoTidyModule/LenovoTidyChecks.*
-            build/src/LenovoTidyMain/lenovo-clang-tidy
-            build/src/LenovoTidyMain/lenovo-clang-tidy.exe
+            LenovoTidyChecks/build/src/LenovoTidyModule/libLenovoTidyChecks.*
+            LenovoTidyChecks/build/src/LenovoTidyModule/LenovoTidyChecks.*
+            LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy
+            LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy.exe
           if-no-files-found: warn
