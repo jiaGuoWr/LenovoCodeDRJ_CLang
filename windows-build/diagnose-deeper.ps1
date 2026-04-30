@@ -1,5 +1,19 @@
 $ErrorActionPreference = 'Continue'
-$base = 'C:\Users\36906\AppData\Local\Microsoft\VisualStudio\17.0_ec695be7'
+
+# Auto-discover the VS 17.0 instance directory; honour LENOVO_VS_INSTANCE
+# override. See diagnose-vs2022.ps1 for rationale.
+$base = $env:LENOVO_VS_INSTANCE
+if (-not $base) {
+    $base = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Microsoft\VisualStudio') `
+                -Directory -EA 0 |
+            Where-Object { $_.Name -match '^17\.0_[a-f0-9]+$' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+}
+if (-not $base -or -not (Test-Path $base)) {
+    throw "Could not locate a VS 17.0 instance under $env:LOCALAPPDATA\Microsoft\VisualStudio. Set LENOVO_VS_INSTANCE to override."
+}
+Write-Host "Using VS instance: $base"
 
 Write-Host '=== A) MEF .err log lenovo-related sections ==='
 $errLog = Join-Path $base 'ComponentModelCache\Microsoft.VisualStudio.Default.err'

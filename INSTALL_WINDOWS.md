@@ -265,3 +265,34 @@ End-to-end validated as of 2026-04-30:
 - [x] Installing `LenovoTidy.vsix` into VS 2022 produces diagnostics in the
       Error List (activation path verified both by `smoke-activate.ps1`
       headless run and GUI confirmation)
+
+## Pre-release manual gate (required before tagging `v*`)
+
+CI cannot exercise the VS 2022 end-to-end activation path because GitHub's
+hosted `windows-2022` runners ship only VS Build Tools, not the full IDE
+with `devenv.exe`. Before pushing a release tag (which triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml)), a maintainer
+on a machine with VS 2022 Community/Pro/Enterprise installed MUST run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+    D:\LenovoDRJ_CLang\windows-build\verify.ps1
+```
+
+This invokes [`smoke-activate.ps1`](windows-build/smoke-activate.ps1) which
+launches `devenv.exe` with `/Log` plus a `.cpp` file, polls for
+`lenovo-tidy-lsp.exe` in the process list for 120 seconds, and fails the
+phase if the LSP did not spawn. Only when this exits 0 (and the operator
+visually confirms `lenovo-*` diagnostics appear in the Error List on a
+real VS session) should the tag be pushed.
+
+This gate catches the three classes of regression that have historically
+produced "VSIX installs but does nothing" symptoms:
+
+1. Strong-name binding mismatch on `Microsoft.VisualStudio.LanguageServer.Client`
+2. Missing `[ContentType("C/C++")]` on `LenovoTidyClient`
+3. Class-level `[Export]` on `LenovoTidyContentDefinition` (must be a
+   static-field `[Export]` of `ContentTypeDefinition`)
+
+See the corresponding entries under "VS 2022: extension installs but
+`lenovo-tidy-lsp.exe` never appears in Task Manager" above.

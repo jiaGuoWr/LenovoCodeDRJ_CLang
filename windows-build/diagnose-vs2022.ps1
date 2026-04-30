@@ -1,7 +1,40 @@
 # Read-only diagnostic for VS 2022 Lenovo Tidy state
 $ErrorActionPreference = 'Continue'
-$base   = 'C:\Users\36906\AppData\Local\Microsoft\VisualStudio\17.0_ec695be7'
-$vsRoot = 'D:\Program Files\Microsoft Visual Studio\2022\Community'
+
+# Auto-discover the VS 17.0 instance directory (pattern is "17.0_<hash>",
+# e.g. 17.0_ec695be7). Pick the most recently modified non-Exp instance
+# so re-running on a fresh dev machine "just works" without editing the
+# script. Honour LENOVO_VS_INSTANCE override for split-config setups.
+$base = $env:LENOVO_VS_INSTANCE
+if (-not $base) {
+    $base = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Microsoft\VisualStudio') `
+                -Directory -EA 0 |
+            Where-Object { $_.Name -match '^17\.0_[a-f0-9]+$' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+}
+if (-not $base -or -not (Test-Path $base)) {
+    throw "Could not locate a VS 17.0 instance under $env:LOCALAPPDATA\Microsoft\VisualStudio. Set LENOVO_VS_INSTANCE to override."
+}
+Write-Host "Using VS instance: $base"
+
+# Same auto-discovery for the install root: prefer LENOVO_VS_ROOT, else
+# the standard layout under either D:\Program Files\... or
+# C:\Program Files\... (whichever exists first).
+$vsRoot = $env:LENOVO_VS_ROOT
+if (-not $vsRoot) {
+    foreach ($candidate in @(
+        'D:\Program Files\Microsoft Visual Studio\2022\Community',
+        'C:\Program Files\Microsoft Visual Studio\2022\Community',
+        'D:\Program Files\Microsoft Visual Studio\2022\Professional',
+        'C:\Program Files\Microsoft Visual Studio\2022\Professional',
+        'D:\Program Files\Microsoft Visual Studio\2022\Enterprise',
+        'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
+    )) {
+        if (Test-Path $candidate) { $vsRoot = $candidate; break }
+    }
+}
+Write-Host "Using VS root: $vsRoot"
 
 # ---- scope: per-user AND per-machine install locations ----
 # VSIXInstaller with /a writes to Common7\IDE\Extensions (per-machine),
@@ -79,7 +112,8 @@ if (Test-Path $cacheFile) {
 
 Write-Host ''
 Write-Host '=== 4) Latest ActivityLog status ==='
-foreach ($rs in @('17.0_ec695be7','17.0_ec695be7Exp')) {
+$instanceLeaf = Split-Path $base -Leaf  # e.g. "17.0_ec695be7"
+foreach ($rs in @($instanceLeaf, ($instanceLeaf + 'Exp'))) {
     $logFile = Join-Path ($env:APPDATA + '\Microsoft\VisualStudio') (Join-Path $rs 'ActivityLog.xml')
     if (Test-Path $logFile) {
         $mtime = (Get-Item $logFile).LastWriteTime

@@ -1,0 +1,378 @@
+name: release
+
+# Single end-to-end release pipeline triggered on tag push (v*).
+#
+# Pipeline shape:
+#
+#   build-checks (matrix: linux/macos/windows)        \
+#                                                     -> package-vscode (linux)
+#   build-lsp    (matrix: linux/macos/windows)        /
+#                                                     -> package-vs2022 (windows)
+#                                                     -> package-checks-archive (matrix)
+#                                                                                                    \
+#                                                                                                     -> publish-release
+#
+# All packaging jobs depend on build outputs via `needs:`, so artifacts
+# are produced fresh in the same workflow run (no cross-workflow artifact
+# fetch which `actions/download-artifact@v4` does not support).
+#
+# Pre-release manual gate: developers MUST run windows-build/verify.ps1
+# (which now invokes smoke-activate.ps1 to confirm VS 2022 actually
+# spawns lenovo-tidy-lsp.exe) before tagging. CI runners are headless
+# windows-2022 images that lack the full VS 2022 IDE and therefore
+# cannot reproduce that check. See INSTALL_WINDOWS.md for the procedure.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (or any string for dry-run)"
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # =========================================================================
+  # 1. Build the C++ Clang-Tidy plugin / lenovo-clang-tidy.exe on every OS.
+  # =========================================================================
+  build-checks:
+    name: build-checks ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_glob: |
+              LenovoTidyChecks/build/src/LenovoTidyModule/libLenovoTidyChecks.so
+              LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy
+          - os: macos-14
+            artifact_glob: |
+              LenovoTidyChecks/build/src/LenovoTidyModule/libLenovoTidyChecks.dylib
+              LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy
+          - os: windows-2022
+            artifact_glob: |
+              LenovoTidyChecks/build/src/LenovoTidyModule/LenovoTidyChecks.dll
+              LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y llvm-18-dev libclang-18-dev libclang-cpp18-dev clang-tools-18 ninja-build
+
+      - name: Install LLVM 18 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@18 ninja
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
+
+      - name: Install LLVM 18 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install llvm --version=18.1.8 -y
+          choco install ninja -y
+
+      - name: Configure
+        shell: bash
+        working-directory: LenovoTidyChecks
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLENOVO_TIDY_BUILD_TESTS=OFF
+
+      - name: Build
+        working-directory: LenovoTidyChecks
+        run: cmake --build build -j
+
+      - name: Upload checks artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: checks-${{ matrix.os }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  # =========================================================================
+  # 2. Build the Rust LSP server on every OS.
+  # =========================================================================
+  build-lsp:
+    name: build-lsp ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: lenovo-tidy-lsp
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact: lenovo-tidy-lsp
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            artifact: lenovo-tidy-lsp.exe
+    defaults:
+      run:
+        working-directory: LenovoTidyLsp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: LenovoTidyLsp
+
+      - name: Build (release)
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload LSP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsp-${{ matrix.os }}
+          path: LenovoTidyLsp/target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  # =========================================================================
+  # 3. Standalone tarballs of LenovoTidyChecks per OS (for non-IDE users).
+  # =========================================================================
+  package-checks-archive:
+    name: package-checks ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: build-checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: checks-${{ matrix.os }}
+          path: dl/
+
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p dist/LenovoTidyChecks
+          cp -R dl/. dist/LenovoTidyChecks/ 2>/dev/null || true
+          cp -R LenovoTidyChecks/src/LenovoTidyModule/common dist/LenovoTidyChecks/headers-common
+          cp LenovoTidyChecks/LICENSE LenovoTidyChecks/CHANGELOG.md LenovoTidyChecks/README.md dist/LenovoTidyChecks/
+          cp -R LenovoTidyChecks/docs dist/LenovoTidyChecks/docs
+
+      - name: Pack
+        shell: bash
+        run: |
+          cd dist
+          REF="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "LenovoTidyChecks-${REF}-${{ runner.os }}.zip" LenovoTidyChecks
+          else
+            tar -czf "LenovoTidyChecks-${REF}-${{ runner.os }}.tar.gz" LenovoTidyChecks
+          fi
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: checks-archive-${{ matrix.os }}
+          path: |
+            dist/LenovoTidyChecks-*.tar.gz
+            dist/LenovoTidyChecks-*.zip
+          if-no-files-found: error
+
+  # =========================================================================
+  # 4. Package the VS Code extension (.vsix) with all 3 platforms bundled.
+  # =========================================================================
+  package-vscode:
+    name: package-vscode
+    runs-on: ubuntu-22.04
+    needs: [build-checks, build-lsp]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: LenovoTidyVscode/package-lock.json
+
+      # ---- Pull all 6 build outputs in (3 OS for LSP + 3 OS for plugin) --
+      - uses: actions/download-artifact@v4
+        with:
+          name: lsp-ubuntu-22.04
+          path: LenovoTidyVscode/server-bin/linux-x64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: lsp-macos-14
+          path: LenovoTidyVscode/server-bin/darwin-arm64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: lsp-windows-2022
+          path: LenovoTidyVscode/server-bin/win32-x64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: checks-ubuntu-22.04
+          path: LenovoTidyVscode/server-bin/linux-x64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: checks-macos-14
+          path: LenovoTidyVscode/server-bin/darwin-arm64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: checks-windows-2022
+          path: LenovoTidyVscode/server-bin/win32-x64/
+
+      # download-artifact preserves the tree it was uploaded with, so we
+      # have to flatten LenovoTidyModule/lib*.so back to the platform
+      # folder root.
+      - name: Flatten server-bin layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          for plat in linux-x64 darwin-arm64 win32-x64; do
+            cd "LenovoTidyVscode/server-bin/$plat"
+            find . -mindepth 2 -type f -exec mv -f {} . \;
+            find . -mindepth 1 -type d -empty -delete
+            ls -la
+            cd - >/dev/null
+          done
+          chmod +x LenovoTidyVscode/server-bin/linux-x64/lenovo-tidy-lsp || true
+          chmod +x LenovoTidyVscode/server-bin/linux-x64/lenovo-clang-tidy || true
+          chmod +x LenovoTidyVscode/server-bin/darwin-arm64/lenovo-tidy-lsp || true
+          chmod +x LenovoTidyVscode/server-bin/darwin-arm64/lenovo-clang-tidy || true
+
+      - name: Install deps
+        working-directory: LenovoTidyVscode
+        run: npm ci
+
+      - name: Compile
+        working-directory: LenovoTidyVscode
+        run: npx tsc -p ./
+
+      - name: Package vsix
+        working-directory: LenovoTidyVscode
+        run: npx vsce package --out lenovo-tidy-vscode.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-vscode
+          path: LenovoTidyVscode/lenovo-tidy-vscode.vsix
+          if-no-files-found: error
+
+  # =========================================================================
+  # 5. Package the VS 2022 extension (.vsix). Uses the same repackage
+  #    script as the local windows-build pipeline so the artefacts are
+  #    bit-equivalent.
+  # =========================================================================
+  package-vs2022:
+    name: package-vs2022
+    runs-on: windows-2022
+    needs: [build-checks, build-lsp]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # ---- Pull Windows build outputs into LenovoTidyVs2022/server-bin/win32-x64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: lsp-windows-2022
+          path: LenovoTidyVs2022/server-bin/win32-x64/
+      - uses: actions/download-artifact@v4
+        with:
+          name: checks-windows-2022
+          path: LenovoTidyVs2022/server-bin/win32-x64/
+
+      - name: Flatten server-bin layout
+        shell: pwsh
+        run: |
+          $dir = 'LenovoTidyVs2022/server-bin/win32-x64'
+          Get-ChildItem $dir -Recurse -File | Where-Object { $_.DirectoryName -ne (Resolve-Path $dir).Path } | Move-Item -Destination $dir -Force
+          Get-ChildItem $dir -Recurse -Directory | Where-Object { -not (Get-ChildItem $_.FullName) } | Remove-Item -Force
+          Get-ChildItem $dir | Format-Table
+
+      - name: Restore (pinned to nuget.org via repo nuget.config)
+        working-directory: LenovoTidyVs2022
+        run: dotnet restore LenovoTidy.csproj --configfile ../windows-build/nuget.config
+
+      - name: Build (release, no VSSDK packaging)
+        working-directory: LenovoTidyVs2022
+        run: |
+          dotnet build LenovoTidy.csproj `
+            --configuration Release `
+            --no-restore `
+            /p:DeployExtension=false `
+            /p:CreateVsixContainer=false `
+            --verbosity minimal
+
+      - name: Locate build output dir
+        id: build_out
+        shell: pwsh
+        run: |
+          $cands = @(
+            'LenovoTidyVs2022/bin/x64/Release/net472',
+            'LenovoTidyVs2022/bin/Release/net472'
+          )
+          foreach ($c in $cands) {
+            if (Test-Path (Join-Path $c 'LenovoTidy.dll')) {
+              "build_out=$c" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+              Write-Host "Found build output at $c"
+              exit 0
+            }
+          }
+          throw 'LenovoTidy.dll not found in any expected build output dir'
+
+      - name: Repackage VSIX (the local windows-build script)
+        shell: pwsh
+        run: |
+          ./windows-build/repackage-vs2022-vsix.ps1 `
+            -VsProjectDir   LenovoTidyVs2022 `
+            -BuildOutputDir '${{ steps.build_out.outputs.build_out }}' `
+            -ServerBinDir   LenovoTidyVs2022 `
+            -OutVsix        LenovoTidyVs2022/bin/Release/LenovoTidy.vsix `
+            -VsixId         LenovoTidy.VS2022.f89e3441 `
+            -VsixVersion    0.2.0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-vs2022
+          path: LenovoTidyVs2022/bin/Release/LenovoTidy.vsix
+          if-no-files-found: error
+
+  # =========================================================================
+  # 6. Publish everything to a GitHub Release.
+  # =========================================================================
+  publish-release:
+    name: publish-release
+    runs-on: ubuntu-22.04
+    needs: [package-checks-archive, package-vscode, package-vs2022]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+          merge-multiple: true
+
+      - name: List staged release assets
+        run: ls -la release-artifacts/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/lenovo-tidy-vscode.vsix
+            release-artifacts/LenovoTidy.vsix
+            release-artifacts/LenovoTidyChecks-*.tar.gz
+            release-artifacts/LenovoTidyChecks-*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true

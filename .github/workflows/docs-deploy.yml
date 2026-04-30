@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
+      - "LenovoTidyChecks/docs/**"
       - "AnalyzerRules.md"
       - ".github/workflows/docs-deploy.yml"
   workflow_dispatch:
@@ -32,13 +32,14 @@ jobs:
         run: pip install mkdocs mkdocs-material pymdown-extensions
 
       - name: Build site
-        run: |
-          cd docs
-          mkdocs build --strict
+        # mkdocs.yml lives in LenovoTidyChecks/docs/ and emits its site
+        # to LenovoTidyChecks/site/ via `site_dir: ../site`.
+        working-directory: LenovoTidyChecks/docs
+        run: mkdocs build --strict
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: LenovoTidyChecks/site
 
   deploy:
     needs: build
