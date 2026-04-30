@@ -32,10 +32,13 @@ jobs:
         run: pip install mkdocs mkdocs-material pymdown-extensions
 
       - name: Build site
-        # mkdocs.yml lives in LenovoTidyChecks/docs/ and emits its site
-        # to LenovoTidyChecks/site/ via `site_dir: ../site`.
-        working-directory: LenovoTidyChecks/docs
-        run: mkdocs build --strict
+        # mkdocs.yml lives at LenovoTidyChecks/ (next to docs/) per the
+        # current mkdocs convention that forbids docs_dir == config_dir.
+        # NOT --strict because some legitimate cross-tree links (e.g. to
+        # the repo-root AnalyzerRules.md, which lives outside docs/) emit
+        # warnings that should not fail the build.
+        working-directory: LenovoTidyChecks
+        run: mkdocs build
 
       - uses: actions/upload-pages-artifact@v3
         with:
