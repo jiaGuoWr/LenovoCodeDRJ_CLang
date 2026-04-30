@@ -97,11 +97,21 @@ impl Config {
         // into the same process can crash on Windows due to double-init of the
         // shared LLVM state. So we ignore plugin_path entirely in that case,
         // even if the IDE client supplied one.
-        let is_bundled_lenovo = clang_tidy_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .map(|s| s.eq_ignore_ascii_case("lenovo-clang-tidy"))
-            .unwrap_or(false);
+        // Path-leaf comparison must work for paths the client may have
+        // produced on a different OS (e.g. a Windows-style backslash path
+        // arriving at a Linux-built lenovo-tidy-lsp binary in a remote /
+        // container scenario). std::path::Path only treats `/` as a
+        // separator on Linux/macOS, so we normalise both `/` and `\`
+        // ourselves before extracting the stem.
+        let is_bundled_lenovo = {
+            let raw = clang_tidy_path.as_os_str().to_string_lossy();
+            let leaf = raw.rsplit(|c| c == '/' || c == '\\').next().unwrap_or("");
+            let stem = leaf
+                .strip_suffix(".exe")
+                .or_else(|| leaf.strip_suffix(".EXE"))
+                .unwrap_or(leaf);
+            stem.eq_ignore_ascii_case("lenovo-clang-tidy")
+        };
 
         let plugin_path = if is_bundled_lenovo {
             None
