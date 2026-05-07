@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/jiaGuoWr/LenovoCodeDRJ_CLang/tree/main/LenovoTidyChecks/docs
+    about: Rule reference, architecture, and integration guides live here.
+  - name: Windows install guide
+    url: https://github.com/jiaGuoWr/LenovoCodeDRJ_CLang/blob/main/INSTALL_WINDOWS.md
+    about: Step-by-step setup for the VS 2022 / VS Code extensions on Windows.

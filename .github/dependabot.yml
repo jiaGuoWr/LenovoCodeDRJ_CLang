@@ -1,0 +1,99 @@
+# Dependabot configuration for Lenovo DRJ C-Lang.
+#
+# Scope:
+#   * GitHub Actions versions across all 5 workflows  -> weekly, grouped
+#   * Rust crates inside LenovoTidyLsp/Cargo.toml     -> weekly, grouped
+#   * npm packages inside LenovoTidyVscode/           -> weekly, grouped
+#   * NuGet packages inside LenovoTidyVs2022/         -> weekly
+#   * (no Cargo.lock for sub-projects, no other npm/dotnet workspaces)
+#
+# Grouping rationale: minor/patch bumps land in one PR per ecosystem to keep
+# review burden bounded; majors stay separate because they typically need
+# manual migration work (eg tower-lsp / vscode-languageclient majors).
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      gh-actions-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "cargo"
+    directory: "/LenovoTidyLsp"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "lsp"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+    groups:
+      cargo-minor:
+        update-types: ["minor", "patch"]
+    ignore:
+      # tower-lsp 0.x has frequent breaking changes; bump manually.
+      - dependency-name: "tower-lsp"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/LenovoTidyVscode"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "vscode"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "vscode"
+    groups:
+      npm-types:
+        patterns:
+          - "@types/*"
+      npm-minor:
+        update-types: ["minor", "patch"]
+    ignore:
+      # vscode-languageclient must match the version range declared in
+      # package.json#engines.vscode; bump manually with extension updates.
+      - dependency-name: "vscode-languageclient"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "nuget"
+    directory: "/LenovoTidyVs2022"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "vs2022"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "vs2022"
+    ignore:
+      # Microsoft.VisualStudio.LanguageServer.Client is hard-pinned to
+      # 17.12.0.0 by extension-build.yml; do not auto-bump.
+      - dependency-name: "Microsoft.VisualStudio.LanguageServer.Client"

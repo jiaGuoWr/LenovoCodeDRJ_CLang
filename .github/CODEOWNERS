@@ -1,0 +1,48 @@
+# CODEOWNERS for Lenovo DRJ C-Lang.
+#
+# GitHub auto-requests review from the listed owner(s) when any file under
+# the matching path changes. Order matters: later rules override earlier.
+#
+# Until a real team handle is provisioned, all reviews route to the repo
+# owner @jiaGuoWr. Replace with @lenovo/drj-clang-team (or whatever Lenovo
+# org team alias is set up) once available.
+
+# ---------------------------------------------------------------------------
+# Default reviewer for everything not matched below.
+# ---------------------------------------------------------------------------
+*                                       @jiaGuoWr
+
+# ---------------------------------------------------------------------------
+# Build / CI - require sign-off from the maintainer because broken CI
+# blocks every other PR.
+# ---------------------------------------------------------------------------
+/.github/                               @jiaGuoWr
+/.gitattributes                         @jiaGuoWr
+/.gitignore                             @jiaGuoWr
+/windows-build/                         @jiaGuoWr
+/LenovoTidyChecks/ci/                   @jiaGuoWr
+/LenovoTidyChecks/cmake/                @jiaGuoWr
+/LenovoTidyChecks/CMakeLists.txt        @jiaGuoWr
+/LenovoTidyChecks/CMakePresets.json     @jiaGuoWr
+
+# ---------------------------------------------------------------------------
+# Static-analysis rules: changes here directly affect users' diagnostics.
+# Adding a new rule must come with a docs/rules/<id>.md and a tests/checkers
+# fixture - the PR template enforces that checklist.
+# ---------------------------------------------------------------------------
+/LenovoTidyChecks/src/LenovoTidyModule/ @jiaGuoWr
+/LenovoTidyChecks/docs/rules/           @jiaGuoWr
+/LenovoTidyChecks/tests/checkers/       @jiaGuoWr
+/AnalyzerRules.md                       @jiaGuoWr
+
+# ---------------------------------------------------------------------------
+# LSP (Rust) - touchy because it spawns clang-tidy and parses YAML; an
+# accidental panic crashes diagnostics for the whole IDE session.
+# ---------------------------------------------------------------------------
+/LenovoTidyLsp/                         @jiaGuoWr
+
+# ---------------------------------------------------------------------------
+# IDE extensions.
+# ---------------------------------------------------------------------------
+/LenovoTidyVscode/                      @jiaGuoWr
+/LenovoTidyVs2022/                      @jiaGuoWr

@@ -1,0 +1,73 @@
+name: New rule proposal
+description: Propose a new lenovo-* Clang-Tidy rule.
+title: "[Rule] "
+labels: ["rule-proposal", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose a brand-new lenovo-* rule. For tweaks
+        to an existing rule, please file a bug report instead.
+
+  - type: input
+    id: proposed-id
+    attributes:
+      label: Proposed rule ID
+      description: Use the next free slot in the AnalyzerRules.md table (e.g. lenovo-sec012-something).
+      placeholder: lenovo-???
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - security (sec)
+        - localization (chn)
+        - naming (name)
+        - reliability (exc)
+        - maintainability (code)
+        - performance (perf - new category)
+        - other (please describe)
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What real-world bug, security issue, or style violation does this rule prevent?
+    validations:
+      required: true
+
+  - type: textarea
+    id: bad-pattern
+    attributes:
+      label: Pattern that should fire (negative example)
+      render: cpp
+      placeholder: |
+        // example: hardcoded JWT secret
+        static const char *kSecret = "eyJhbGciOiJIUzI1NiJ9...";
+    validations:
+      required: true
+
+  - type: textarea
+    id: good-pattern
+    attributes:
+      label: Pattern that should NOT fire (positive example)
+      render: cpp
+      placeholder: |
+        const char *secret = std::getenv("APP_SECRET");
+
+  - type: textarea
+    id: detection
+    attributes:
+      label: Suggested detection approach
+      description: AST-matcher predicates, regex on tokens, both? Note any edge cases (templates, lambdas, generated code).
+
+  - type: textarea
+    id: severity
+    attributes:
+      label: Suggested severity / category
+      placeholder: warning - this should never appear in production code
