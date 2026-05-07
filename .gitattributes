@@ -1,0 +1,100 @@
+# =============================================================================
+#  Lenovo DRJ C-Lang - line-ending normalisation
+#
+#  Without this file, contributors on Windows pull LF-encoded source files,
+#  Git's default `core.autocrlf=true` rewrites them to CRLF on checkout, and
+#  any subsequent `git add` shows the entire repository as "modified" purely
+#  due to line-ending churn (180 files / 13k+ lines, observed in practice).
+#
+#  Strategy:
+#   * default: detect text vs binary automatically (`text=auto`) and force
+#     LF in the working tree (`eol=lf`). The repository canonical form is LF.
+#   * Windows-only batch / PowerShell / Visual Studio project files keep
+#     CRLF so that the tooling on Windows does not complain.
+#   * everything in `windows-build/` is Windows-targeted by design; LF is
+#     fine there because PowerShell 5+ and modern cmd both accept it, but
+#     we leave the directory unforced to avoid surprises during local edits.
+#   * known-binary types are tagged so Git never tries to diff/merge them.
+# =============================================================================
+
+* text=auto eol=lf
+
+# ---------------------------------------------------------------------------
+# Windows-native text files: keep CRLF so cmd.exe / nmake / older toolchains
+# behave correctly on contributors' machines.
+# ---------------------------------------------------------------------------
+*.bat            text eol=crlf
+*.cmd            text eol=crlf
+*.ps1            text eol=crlf
+*.psm1           text eol=crlf
+*.psd1           text eol=crlf
+*.sln            text eol=crlf
+*.vcxproj        text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.csproj         text eol=crlf
+*.props          text eol=crlf
+*.targets        text eol=crlf
+
+# ---------------------------------------------------------------------------
+# Source code, scripts, configs - LF everywhere.
+# ---------------------------------------------------------------------------
+*.c              text eol=lf
+*.cc             text eol=lf
+*.cpp            text eol=lf
+*.cxx            text eol=lf
+*.h              text eol=lf
+*.hh             text eol=lf
+*.hpp            text eol=lf
+*.rs             text eol=lf
+*.toml           text eol=lf
+*.cs             text eol=lf
+*.ts             text eol=lf
+*.tsx            text eol=lf
+*.js             text eol=lf
+*.jsx            text eol=lf
+*.json           text eol=lf
+*.yml            text eol=lf
+*.yaml           text eol=lf
+*.md             text eol=lf
+*.py             text eol=lf
+*.sh             text eol=lf
+*.cmake          text eol=lf
+CMakeLists.txt   text eol=lf
+Dockerfile*      text eol=lf
+.gitignore       text eol=lf
+.gitattributes   text eol=lf
+.clang-format    text eol=lf
+.clang-tidy      text eol=lf
+
+# ---------------------------------------------------------------------------
+# Binary - never normalise, never diff inline.
+# ---------------------------------------------------------------------------
+*.png            binary
+*.jpg            binary
+*.jpeg           binary
+*.gif            binary
+*.ico            binary
+*.pdf            binary
+*.zip            binary
+*.7z             binary
+*.gz             binary
+*.tar            binary
+*.tgz            binary
+*.xz             binary
+*.dll            binary
+*.exe            binary
+*.so             binary
+*.so.*           binary
+*.dylib          binary
+*.lib            binary
+*.a              binary
+*.pdb            binary
+*.vsix           binary
+*.snk            binary
+
+# ---------------------------------------------------------------------------
+# Reduce diff noise for generated lockfiles - they're text but reviewers
+# rarely need to see line-by-line changes.
+# ---------------------------------------------------------------------------
+Cargo.lock       linguist-generated=true text eol=lf
+package-lock.json linguist-generated=true text eol=lf
