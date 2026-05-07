@@ -118,7 +118,7 @@ jobs:
         run: cmake --build build -j
 
       - name: Upload checks artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: checks-${{ matrix.os }}
           path: ${{ matrix.artifact_glob }}
@@ -161,7 +161,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload LSP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lsp-${{ matrix.os }}
           path: LenovoTidyLsp/target/${{ matrix.target }}/release/${{ matrix.artifact }}
@@ -207,7 +207,7 @@ jobs:
           fi
 
       - name: Upload archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: checks-archive-${{ matrix.os }}
           path: |
@@ -288,7 +288,7 @@ jobs:
         working-directory: LenovoTidyVscode
         run: npx vsce package --out lenovo-tidy-vscode.vsix
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix-vscode
           path: LenovoTidyVscode/lenovo-tidy-vscode.vsix
@@ -370,7 +370,7 @@ jobs:
             -VsixId         LenovoTidy.VS2022.f89e3441 `
             -VsixVersion    0.2.0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix-vs2022
           path: LenovoTidyVs2022/bin/Release/LenovoTidy.vsix
