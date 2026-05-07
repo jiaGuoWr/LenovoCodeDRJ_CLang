@@ -21,14 +21,14 @@ jobs:
   #
   # Soft-fail for now: the existing src/ tree was committed before this
   # workflow existed and contains many pre-existing clang-format
-  # violations. Surfacing them in CI annotations gives contributors
-  # incremental visibility without blocking merges. Flip
-  # `continue-on-error: false` once a one-shot reformat PR has landed.
+  # violations. The check step uses `continue-on-error: true` so the
+  # violations surface as workflow annotations without painting the
+  # PR check UI red. Drop that flag once a one-shot reformat PR has
+  # landed.
   # --------------------------------------------------------------------
   cpp-format:
     name: clang-format
     runs-on: ubuntu-22.04
-    continue-on-error: true
     if: |
       github.event_name == 'push' ||
       contains(toJson(github.event.pull_request.changed_files), '.cpp') ||
@@ -46,6 +46,10 @@ jobs:
           sudo apt-get install -y clang-format-18
 
       - name: Run clang-format --dry-run -Werror
+        # Step-level continue-on-error: the step still runs to completion
+        # and emits annotations, but a non-zero exit does not fail the
+        # job, so the PR check UI stays green.
+        continue-on-error: true
         working-directory: LenovoTidyChecks
         run: |
           # Scope: only files we own; skip generated build/, third-party
@@ -62,13 +66,13 @@ jobs:
   # Rust formatting + lints (LenovoTidyLsp).
   #
   # Soft-fail rationale identical to cpp-format above: the LSP code was
-  # written before rustfmt/clippy were wired into CI; flip to hard-fail
-  # once a `cargo fmt --all` + clippy-cleanup PR has landed.
+  # written before rustfmt/clippy were wired into CI. Each check uses
+  # step-level continue-on-error so the PR check UI shows a single
+  # green checkmark with annotations instead of a red X.
   # --------------------------------------------------------------------
   rust-fmt-clippy:
     name: rustfmt + clippy
     runs-on: ubuntu-22.04
-    continue-on-error: true
     defaults:
       run:
         working-directory: LenovoTidyLsp
@@ -84,11 +88,14 @@ jobs:
           workspaces: LenovoTidyLsp
 
       - name: cargo fmt --check
+        continue-on-error: true
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        # -D warnings: any warning fails the job. Add #[allow(...)] with a
-        # comment if a specific lint is genuinely a false positive.
+        # -D warnings: any warning fails the step (and emits annotations).
+        # continue-on-error keeps the job green; flip both rust steps off
+        # once a clippy-cleanup PR has landed.
+        continue-on-error: true
         run: cargo clippy --all-targets -- -D warnings
 
   # --------------------------------------------------------------------
