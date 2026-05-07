@@ -40,7 +40,7 @@
       vsixmanifest.
     -->
     <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.12.48" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <!--
       Pin the highest System.Text.Json the dependency tree pulls in, so
       NuGet doesn't fail the restore with NU1605 (a 8.0.4 / 8.0.5 split
