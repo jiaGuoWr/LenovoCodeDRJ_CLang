@@ -1,0 +1,98 @@
+name: Bug report
+description: A Lenovo Tidy rule misfires, the IDE extension breaks, or build fails.
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. The more details you
+        give us, the faster we can reproduce and fix it.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of Lenovo Tidy is misbehaving?
+      options:
+        - LenovoTidyChecks (C++ Clang-Tidy module / lenovo-clang-tidy.exe)
+        - LenovoTidyLsp (Rust LSP server)
+        - LenovoTidyVscode (VS Code extension)
+        - LenovoTidyVs2022 (VS 2022 extension)
+        - windows-build / packaging scripts
+        - CI / GitHub Actions
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: rule-id
+    attributes:
+      label: Rule ID (if applicable)
+      description: e.g. lenovo-sec005-insecure-random
+      placeholder: lenovo-sec???-...
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug.
+      placeholder: When I open foo.cpp, lenovo-sec001 reports password = "abc" on a comment, but it should only fire on string literals assigned to identifiers containing 'password'.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal code, IDE actions, or build commands.
+      render: shell
+      placeholder: |
+        1. mkdir bug && cd bug
+        2. cat > main.cpp << 'EOF'
+           // password = "secret"
+           EOF
+        3. lenovo-clang-tidy --checks=-*,lenovo-sec001 main.cpp --
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+
+  - type: input
+    id: version
+    attributes:
+      label: Version (extension or lenovo-clang-tidy --version output)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 10
+        - Windows 11
+        - Ubuntu 22.04
+        - Ubuntu 24.04
+        - macOS 13 (Ventura)
+        - macOS 14 (Sonoma)
+        - macOS 15 (Sequoia)
+        - Other (please mention in additional context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      description: "Output of `Lenovo Tidy: Show Server Output` (VS Code) or the relevant CI log section."
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

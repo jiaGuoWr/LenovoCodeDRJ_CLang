@@ -1,0 +1,146 @@
+name: lint
+
+# Style / formatting checks. Cheap to run, gates merges before the
+# heavier build-test / lsp-build / extension-build matrices kick in.
+#
+# Each job has tight `paths:` filters so e.g. a docs-only PR does not
+# spin up a Rust toolchain.
+
+on:
+  pull_request:
+  push:
+    branches: [main, "release/**"]
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------
+  # C++ formatting (LenovoTidyChecks).
+  # --------------------------------------------------------------------
+  cpp-format:
+    name: clang-format
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name == 'push' ||
+      contains(toJson(github.event.pull_request.changed_files), '.cpp') ||
+      contains(toJson(github.event.pull_request.changed_files), '.h')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format-18
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/llvm.gpg
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-18.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: Run clang-format --dry-run -Werror
+        working-directory: LenovoTidyChecks
+        run: |
+          # Scope: only files we own; skip generated build/, third-party
+          # examples may legitimately use a different style.
+          mapfile -t files < <(find src -type f \( -name '*.cpp' -o -name '*.h' \))
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No C++ sources found - skipping."
+            exit 0
+          fi
+          echo "Checking ${#files[@]} files..."
+          clang-format-18 --style=file --dry-run --Werror "${files[@]}"
+
+  # --------------------------------------------------------------------
+  # Rust formatting + lints (LenovoTidyLsp).
+  # --------------------------------------------------------------------
+  rust-fmt-clippy:
+    name: rustfmt + clippy
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: LenovoTidyLsp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: LenovoTidyLsp
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        # -D warnings: any warning fails the job. Add #[allow(...)] with a
+        # comment if a specific lint is genuinely a false positive.
+        run: cargo clippy --all-targets -- -D warnings
+
+  # --------------------------------------------------------------------
+  # TypeScript type-check + JSON validation (LenovoTidyVscode).
+  # extension-build.yml already runs `tsc --noEmit`, but doing it here
+  # too keeps the PR feedback loop quick on docs/ts-only changes.
+  # --------------------------------------------------------------------
+  vscode-tsc:
+    name: tsc + json
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: LenovoTidyVscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: LenovoTidyVscode/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Type-check (no emit)
+        run: npx tsc --noEmit -p ./
+
+      - name: Validate package.json + tsconfig.json
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
+          node -e "
+            const s = require('fs').readFileSync('tsconfig.json','utf8');
+            // strip // line comments + trailing commas tsc accepts
+            const cleaned = s.replace(/\/\/.*$/gm,'').replace(/,(\s*[\]}])/g,'$1');
+            JSON.parse(cleaned);
+          "
+
+  # --------------------------------------------------------------------
+  # YAML lint for the workflow files themselves. Catches indentation /
+  # quoting bugs before pushing to main triggers a broken pipeline.
+  # --------------------------------------------------------------------
+  yaml-lint:
+    name: yamllint workflows
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name == 'push' ||
+      contains(toJson(github.event.pull_request.changed_files), '.yml') ||
+      contains(toJson(github.event.pull_request.changed_files), '.yaml')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install yamllint==1.35.1
+
+      - name: Lint workflow yamls
+        # Loose ruleset: line-length disabled (CI yaml is naturally wide),
+        # truthy disabled (`on:` keyword conflicts with the truthy check).
+        run: |
+          # `new-lines: disable` so a contributor on Windows whose editor
+          # writes CRLF doesn't fail this job - .gitattributes already
+          # canonicalises to LF on the next checkout.
+          yamllint -d "{extends: relaxed, rules: {line-length: disable, truthy: disable, document-start: disable, new-lines: disable}}" \
+            .github/workflows/ .github/dependabot.yml
