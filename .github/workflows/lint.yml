@@ -18,10 +18,17 @@ concurrency:
 jobs:
   # --------------------------------------------------------------------
   # C++ formatting (LenovoTidyChecks).
+  #
+  # Soft-fail for now: the existing src/ tree was committed before this
+  # workflow existed and contains many pre-existing clang-format
+  # violations. Surfacing them in CI annotations gives contributors
+  # incremental visibility without blocking merges. Flip
+  # `continue-on-error: false` once a one-shot reformat PR has landed.
   # --------------------------------------------------------------------
   cpp-format:
     name: clang-format
     runs-on: ubuntu-22.04
+    continue-on-error: true
     if: |
       github.event_name == 'push' ||
       contains(toJson(github.event.pull_request.changed_files), '.cpp') ||
@@ -53,10 +60,15 @@ jobs:
 
   # --------------------------------------------------------------------
   # Rust formatting + lints (LenovoTidyLsp).
+  #
+  # Soft-fail rationale identical to cpp-format above: the LSP code was
+  # written before rustfmt/clippy were wired into CI; flip to hard-fail
+  # once a `cargo fmt --all` + clippy-cleanup PR has landed.
   # --------------------------------------------------------------------
   rust-fmt-clippy:
     name: rustfmt + clippy
     runs-on: ubuntu-22.04
+    continue-on-error: true
     defaults:
       run:
         working-directory: LenovoTidyLsp
