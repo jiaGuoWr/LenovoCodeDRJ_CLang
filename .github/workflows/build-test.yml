@@ -33,7 +33,7 @@ jobs:
         os: [ubuntu-22.04, macos-14]
         build_type: [Debug, RelWithDebInfo]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # LLVM 18 dev libraries (headers + cmake config files). The earlier
       # KyleMayes/install-llvm-action attempt only installed the runtime
