@@ -59,7 +59,7 @@ jobs:
               LenovoTidyChecks/build/src/LenovoTidyModule/LenovoTidyChecks.dll
               LenovoTidyChecks/build/src/LenovoTidyMain/lenovo-clang-tidy.exe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Same install path as build-test.yml so PR validation and release
       # builds remain reproducible. See build-test.yml for rationale.
@@ -147,7 +147,7 @@ jobs:
       run:
         working-directory: LenovoTidyLsp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -179,7 +179,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, macos-14, windows-2022]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/download-artifact@v4
         with:
@@ -223,7 +223,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [build-checks, build-lsp]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
@@ -304,7 +304,7 @@ jobs:
     runs-on: windows-2022
     needs: [build-checks, build-lsp]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-dotnet@v4
         with:
