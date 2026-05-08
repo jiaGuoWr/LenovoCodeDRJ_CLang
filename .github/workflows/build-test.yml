@@ -16,10 +16,14 @@ concurrency:
   group: build-test-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: ${{ matrix.os }} / ${{ matrix.build_type }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +37,11 @@ jobs:
         build_type: [Debug, RelWithDebInfo]
     steps:
       - uses: actions/checkout@v6
+
+      - name: Disable Windows Defender real-time monitoring
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
 
       # LLVM 18 dev libraries (headers + cmake config files). The earlier
       # KyleMayes/install-llvm-action attempt only installed the runtime
@@ -53,8 +62,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install llvm@18 ninja
-          # PEP 668 forces --break-system-packages on macos-14 (Python 3.12+).
-          # lit is only needed if we run lit-style tests; ignore failure.
+          brew link --overwrite llvm@18 || true
           pip3 install --user --break-system-packages lit || true
           echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
 
@@ -75,22 +83,19 @@ jobs:
         if: runner.os == 'Windows' && steps.llvm-cache-windows.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          # Official LLVM Windows release tarball (NOT the choco package
-          # which is runtime-only). Includes lib/cmake/llvm/LLVMConfig.cmake
-          # and lib/cmake/clang/ClangConfig.cmake that we need.
-          #
-          # PowerShell's progress bar absolutely tanks performance in
-          # GitHub Actions (no TTY). Silence it. curl.exe (real curl,
-          # not the alias) is much faster than Invoke-WebRequest for
-          # large files and supports retry on transient Fastly errors.
           $ProgressPreference = 'SilentlyContinue'
           $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz'
           curl.exe -L --fail --retry 5 --retry-delay 10 --max-time 900 `
             -o C:\llvm18.tar.xz $url
 
+          # Use 7z instead of bsdtar — xz decompression is dramatically
+          # faster (minutes vs potentially hours with Windows bsdtar).
           mkdir C:\llvm18 -Force | Out-Null
-          tar -xf C:\llvm18.tar.xz -C C:\llvm18 --strip-components=1
-          Remove-Item C:\llvm18.tar.xz -Force
+          7z x C:\llvm18.tar.xz -oC:\ -y
+          7z x C:\llvm18.tar -oC:\llvm18-tmp -y
+          $inner = Get-ChildItem C:\llvm18-tmp -Directory | Select-Object -First 1
+          Move-Item "$($inner.FullName)\*" C:\llvm18\ -Force
+          Remove-Item C:\llvm18.tar.xz, C:\llvm18.tar, C:\llvm18-tmp -Recurse -Force -ErrorAction SilentlyContinue
 
           if (-not (Test-Path 'C:\llvm18\lib\cmake\llvm\LLVMConfig.cmake')) {
             Get-ChildItem C:\llvm18 -Recurse -Name 'LLVMConfig.cmake' | Select-Object -First 5
@@ -152,7 +157,13 @@ jobs:
 
       - name: Build
         working-directory: LenovoTidyChecks
-        run: cmake --build build -j
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cmake --build build -j2
+          else
+            cmake --build build -j
+          fi
 
       - name: Test (unit only)
         working-directory: LenovoTidyChecks

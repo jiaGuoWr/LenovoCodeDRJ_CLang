@@ -14,7 +14,7 @@ name: release
 #
 # All packaging jobs depend on build outputs via `needs:`, so artifacts
 # are produced fresh in the same workflow run (no cross-workflow artifact
-# fetch which `actions/download-artifact@v4` does not support).
+# fetch which `actions/download-artifact@v7` does not support).
 #
 # Pre-release manual gate: developers MUST run windows-build/verify.ps1
 # (which now invokes smoke-activate.ps1 to confirm VS 2022 actually
@@ -35,6 +35,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # =========================================================================
   # 1. Build the C++ Clang-Tidy plugin / lenovo-clang-tidy.exe on every OS.
@@ -42,6 +45,7 @@ jobs:
   build-checks:
     name: build-checks ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -61,6 +65,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Disable Windows Defender real-time monitoring
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       # Same install path as build-test.yml so PR validation and release
       # builds remain reproducible. See build-test.yml for rationale.
       - name: Install LLVM 18 + tools (Ubuntu)
@@ -75,6 +84,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install llvm@18 ninja
+          brew link --overwrite llvm@18 || true
           echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
 
       # Cache the extracted LLVM 18 install so the 600 MB tarball is only
@@ -93,21 +103,20 @@ jobs:
         if: runner.os == 'Windows' && steps.llvm-cache-windows.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          # PowerShell's progress bar absolutely tanks performance in
-          # GitHub Actions (no TTY) - silence it before any web call.
           $ProgressPreference = 'SilentlyContinue'
 
-          # `curl.exe` (real curl, not the alias) downloads the 600 MB
-          # tarball at full bandwidth. `--retry` rides through the
-          # occasional Fastly hiccup that GitHub Releases is prone to
-          # when Actions runners hit it from a hot IP.
           $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz'
           curl.exe -L --fail --retry 5 --retry-delay 10 --max-time 900 `
             -o C:\llvm18.tar.xz $url
 
+          # Use 7z instead of bsdtar — xz decompression is dramatically
+          # faster (minutes vs potentially hours with Windows bsdtar).
           mkdir C:\llvm18 -Force | Out-Null
-          tar -xf C:\llvm18.tar.xz -C C:\llvm18 --strip-components=1
-          Remove-Item C:\llvm18.tar.xz -Force
+          7z x C:\llvm18.tar.xz -oC:\ -y
+          7z x C:\llvm18.tar -oC:\llvm18-tmp -y
+          $inner = Get-ChildItem C:\llvm18-tmp -Directory | Select-Object -First 1
+          Move-Item "$($inner.FullName)\*" C:\llvm18\ -Force
+          Remove-Item C:\llvm18.tar.xz, C:\llvm18.tar, C:\llvm18-tmp -Recurse -Force -ErrorAction SilentlyContinue
 
           if (-not (Test-Path 'C:\llvm18\lib\cmake\llvm\LLVMConfig.cmake')) {
             throw 'LLVMConfig.cmake missing after extraction'
@@ -142,7 +151,13 @@ jobs:
 
       - name: Build
         working-directory: LenovoTidyChecks
-        run: cmake --build build -j
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cmake --build build -j2
+          else
+            cmake --build build -j
+          fi
 
       - name: Upload checks artifact
         uses: actions/upload-artifact@v7
@@ -157,6 +172,7 @@ jobs:
   build-lsp:
     name: build-lsp ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -208,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: checks-${{ matrix.os }}
           path: dl/
@@ -259,27 +275,27 @@ jobs:
           cache-dependency-path: LenovoTidyVscode/package-lock.json
 
       # ---- Pull all 6 build outputs in (3 OS for LSP + 3 OS for plugin) --
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: lsp-ubuntu-22.04
           path: LenovoTidyVscode/server-bin/linux-x64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: lsp-macos-14
           path: LenovoTidyVscode/server-bin/darwin-arm64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: lsp-windows-2022
           path: LenovoTidyVscode/server-bin/win32-x64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: checks-ubuntu-22.04
           path: LenovoTidyVscode/server-bin/linux-x64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: checks-macos-14
           path: LenovoTidyVscode/server-bin/darwin-arm64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: checks-windows-2022
           path: LenovoTidyVscode/server-bin/win32-x64/
@@ -338,11 +354,11 @@ jobs:
           dotnet-version: "8.0.x"
 
       # ---- Pull Windows build outputs into LenovoTidyVs2022/server-bin/win32-x64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: lsp-windows-2022
           path: LenovoTidyVs2022/server-bin/win32-x64/
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: checks-windows-2022
           path: LenovoTidyVs2022/server-bin/win32-x64/
@@ -414,7 +430,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: release-artifacts/
           merge-multiple: true
