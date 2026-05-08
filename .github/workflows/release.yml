@@ -122,6 +122,25 @@ jobs:
             throw 'LLVMConfig.cmake missing after extraction'
           }
 
+      - name: Patch LLVMExports.cmake DIA SDK path (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exports = 'C:\llvm18\lib\cmake\llvm\LLVMExports.cmake'
+          if (-not (Test-Path $exports)) { throw "$exports not found" }
+          $bad = 'C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/DIA SDK/lib/amd64/diaguids.lib'
+          $diaLib = Get-ChildItem 'C:\Program Files*\Microsoft Visual Studio\2022\*\DIA SDK\lib\amd64\diaguids.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $diaLib) { throw 'diaguids.lib not found on this runner' }
+          $good = $diaLib.FullName -replace '\\','/'
+          $content = Get-Content $exports -Raw
+          if ($content.Contains($bad)) {
+            $content = $content.Replace($bad, $good)
+            Set-Content -Path $exports -Value $content -Encoding UTF8 -NoNewline
+            Write-Host "Patched DIA SDK path -> $good"
+          } else {
+            Write-Host "DIA SDK path already correct, skipping patch"
+          }
+
       - name: Install ninja (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
