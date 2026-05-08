@@ -5,6 +5,10 @@
   "version": "0.2.0",
   "publisher": "lenovo",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jiaGuoWr/LenovoCodeDRJ_CLang.git"
+  },
   "engines": {
     "vscode": "^1.118.0"
   },
