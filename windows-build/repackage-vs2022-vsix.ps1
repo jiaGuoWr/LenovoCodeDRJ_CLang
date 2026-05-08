@@ -139,7 +139,12 @@ try {
     # Without these files the modern VSIXInstaller refuses to install with
     # InvalidExtensionPackageException. _rels/.rels (legacy OPC) is NOT
     # used in v3 and we deliberately do not emit it.
-    $stageFull = (Resolve-Path $stage).Path
+    # Use Get-Item instead of Resolve-Path to get the canonical long-name
+    # path. On GitHub Actions Windows runners $env:TEMP contains the 8.3
+    # short name (RUNNER~1) but Get-ChildItem returns long names
+    # (runneradmin). A length mismatch corrupts Substring offsets and
+    # leaks path fragments into zip entry names.
+    $stageFull = (Get-Item $stage).FullName
     $files = @()
     foreach ($f in Get-ChildItem $stage -Recurse -File) {
         $rel = $f.FullName.Substring($stageFull.Length).TrimStart('\','/').Replace('\','/')
