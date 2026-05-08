@@ -23,14 +23,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Windows is intentionally excluded from PR-validation: building
-        # LenovoTidyChecks against a full LLVM 18 dev install on hosted
-        # windows-2022 takes 25+ minutes (the official LLVM tarball is
-        # 600 MB and xz-decompresses very slowly on Windows). Release
-        # builds still run on Windows in release.yml at tag-push time.
-        # extension-build.yml separately validates the VS 2022 build
-        # toolchain on every PR.
-        os: [ubuntu-22.04, macos-14]
+        # Windows is back in the PR matrix: the LLVM 18 tarball install
+        # is now cached via actions/cache (see "Cache LLVM 18 (Windows)"
+        # below), so cold-cache cost is one ~3-5 minute install per
+        # release of llvm-windows-x86_64-18.1.8-vN, and warm-cache cost
+        # is ~30 seconds. The original 25+ minute install rationale
+        # (commit e9504f8) no longer applies.
+        os: [ubuntu-22.04, macos-14, windows-2022]
         build_type: [Debug, RelWithDebInfo]
     steps:
       - uses: actions/checkout@v6
@@ -59,23 +58,52 @@ jobs:
           pip3 install --user --break-system-packages lit || true
           echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
 
-      - name: Install LLVM 18 + tools (Windows)
+      # Cache the extracted LLVM 18 install so the 600 MB tarball is only
+      # downloaded + xz-decompressed on the very first run (or after the
+      # cache key bumps). Bump the trailing -vN whenever the install
+      # layout changes so stale caches are forcibly invalidated.
+      # Same key as release.yml so both workflows share the cache pool.
+      - name: Cache LLVM 18 (Windows)
         if: runner.os == 'Windows'
+        id: llvm-cache-windows
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm18
+          key: llvm-windows-x86_64-18.1.8-v1
+
+      - name: Install LLVM 18 + tools (Windows)
+        if: runner.os == 'Windows' && steps.llvm-cache-windows.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           # Official LLVM Windows release tarball (NOT the choco package
           # which is runtime-only). Includes lib/cmake/llvm/LLVMConfig.cmake
           # and lib/cmake/clang/ClangConfig.cmake that we need.
+          #
+          # PowerShell's progress bar absolutely tanks performance in
+          # GitHub Actions (no TTY). Silence it. curl.exe (real curl,
+          # not the alias) is much faster than Invoke-WebRequest for
+          # large files and supports retry on transient Fastly errors.
+          $ProgressPreference = 'SilentlyContinue'
           $url = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz'
-          $dst = 'C:\llvm18.tar.xz'
-          Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
+          curl.exe -L --fail --retry 5 --retry-delay 10 --max-time 900 `
+            -o C:\llvm18.tar.xz $url
+
           mkdir C:\llvm18 -Force | Out-Null
-          tar -xf $dst -C C:\llvm18 --strip-components=1
-          # Smoke check
+          tar -xf C:\llvm18.tar.xz -C C:\llvm18 --strip-components=1
+          Remove-Item C:\llvm18.tar.xz -Force
+
           if (-not (Test-Path 'C:\llvm18\lib\cmake\llvm\LLVMConfig.cmake')) {
             Get-ChildItem C:\llvm18 -Recurse -Name 'LLVMConfig.cmake' | Select-Object -First 5
             throw 'LLVMConfig.cmake missing after extraction'
           }
+
+      # ninja and lit are NOT cached on purpose: they are tiny and
+      # choco/pip install them in seconds. Always exporting LLVM_HOME
+      # keeps Locate-LLVM-cmake-config below stable across cache hit/miss.
+      - name: Install ninja + lit (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           choco install ninja -y
           py -m pip install --user lit
           echo "LLVM_HOME=C:\llvm18" >> $env:GITHUB_ENV
