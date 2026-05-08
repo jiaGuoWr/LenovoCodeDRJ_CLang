@@ -462,10 +462,19 @@ jobs:
     name: publish-release
     runs-on: ubuntu-22.04
     needs: [package-checks-archive, package-vscode, package-vs2022]
-    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
+      - name: Resolve release version
+        id: ver
+        shell: bash
+        run: |
+          RAW="${{ env.RELEASE_VERSION }}"
+          VER="${RAW#v}"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+          echo "Publishing release: v$VER"
+
       - uses: actions/download-artifact@v7
         with:
           path: release-artifacts/
@@ -476,6 +485,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           files: |
             release-artifacts/lenovo-tidy-vscode.vsix
             release-artifacts/LenovoTidy.vsix
