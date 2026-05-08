@@ -27,8 +27,8 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Existing tag to publish (or any string for dry-run)"
+      version:
+        description: "Release version (e.g. 0.3.0). Tag v<version> will be used."
         required: true
 
 concurrency:
@@ -37,6 +37,9 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # For tag push: strip leading 'v' (v0.2.0 → 0.2.0).
+  # For workflow_dispatch: use the version input directly.
+  RELEASE_VERSION: ${{ github.event.inputs.version || github.ref_name }}
 
 jobs:
   # =========================================================================
@@ -265,7 +268,8 @@ jobs:
         shell: bash
         run: |
           cd dist
-          REF="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          RAW="${{ env.RELEASE_VERSION }}"
+          REF="v${RAW#v}"
           if [ "${{ runner.os }}" = "Windows" ]; then
             7z a "LenovoTidyChecks-${REF}-${{ runner.os }}.zip" LenovoTidyChecks
           else
@@ -425,6 +429,15 @@ jobs:
           }
           throw 'LenovoTidy.dll not found in any expected build output dir'
 
+      - name: Resolve release version
+        id: ver
+        shell: bash
+        run: |
+          RAW="${{ env.RELEASE_VERSION }}"
+          VER="${RAW#v}"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VER"
+
       - name: Repackage VSIX (the local windows-build script)
         shell: pwsh
         run: |
@@ -434,7 +447,7 @@ jobs:
             -ServerBinDir   LenovoTidyVs2022 `
             -OutVsix        LenovoTidyVs2022/bin/Release/LenovoTidy.vsix `
             -VsixId         LenovoTidy.VS2022.f89e3441 `
-            -VsixVersion    0.2.0
+            -VsixVersion    '${{ steps.ver.outputs.version }}'
 
       - uses: actions/upload-artifact@v7
         with:
