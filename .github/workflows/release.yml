@@ -146,6 +146,10 @@ jobs:
         shell: pwsh
         run: choco install ninja -y
 
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Locate LLVM cmake config
         id: llvm_cmake
         shell: bash

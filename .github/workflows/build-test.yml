@@ -132,6 +132,10 @@ jobs:
           py -m pip install --user lit
           echo "LLVM_HOME=C:\llvm18" >> $env:GITHUB_ENV
 
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Locate LLVM cmake config
         id: llvm_cmake
         shell: bash
