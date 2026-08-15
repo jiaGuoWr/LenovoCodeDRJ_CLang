@@ -87,8 +87,12 @@ lenovo-vsix-*.zip
 .DS_Store
 Thumbs.db
 
-# Cursor workspace state (if any)
-.cursor/
+# Cursor workspace state (if any). Keep the committed Cloud Agent
+# environment config under version control; ignore everything else Cursor
+# writes into this directory.
+.cursor/*
+!.cursor/environment.json
+!.cursor/install.sh
 
 # ---------------------- Secrets / credentials (defence in depth) -----------
 *.pem
