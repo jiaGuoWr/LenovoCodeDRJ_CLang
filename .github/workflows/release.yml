@@ -250,7 +250,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checks-${{ matrix.os }}
           path: dl/
@@ -302,27 +302,27 @@ jobs:
           cache-dependency-path: LenovoTidyVscode/package-lock.json
 
       # ---- Pull all 6 build outputs in (3 OS for LSP + 3 OS for plugin) --
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: lsp-ubuntu-22.04
           path: LenovoTidyVscode/server-bin/linux-x64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: lsp-macos-14
           path: LenovoTidyVscode/server-bin/darwin-arm64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: lsp-windows-2022
           path: LenovoTidyVscode/server-bin/win32-x64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checks-ubuntu-22.04
           path: LenovoTidyVscode/server-bin/linux-x64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checks-macos-14
           path: LenovoTidyVscode/server-bin/darwin-arm64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checks-windows-2022
           path: LenovoTidyVscode/server-bin/win32-x64/
@@ -381,11 +381,11 @@ jobs:
           dotnet-version: "8.0.x"
 
       # ---- Pull Windows build outputs into LenovoTidyVs2022/server-bin/win32-x64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: lsp-windows-2022
           path: LenovoTidyVs2022/server-bin/win32-x64/
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checks-windows-2022
           path: LenovoTidyVs2022/server-bin/win32-x64/
@@ -475,7 +475,7 @@ jobs:
           echo "tag=v$VER" >> "$GITHUB_OUTPUT"
           echo "Publishing release: v$VER"
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           path: release-artifacts/
           merge-multiple: true
